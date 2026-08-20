@@ -121,8 +121,15 @@
       var qty = cache.stockMap[p.id] || 0;
       tbody.appendChild(App.ui.el('tr', {}, [
         App.ui.el('td', {}, [
-          App.ui.el('strong', {}, [p.name]),
-          App.ui.el('div', { class: 'text-faint mono' }, [p.sku + (p.barcode ? ' · ' + p.barcode : '')])
+          App.ui.el('div', { class: 'flex items-center gap-8' }, [
+            p.image
+              ? App.ui.el('img', { src: p.image, style: 'width:34px;height:34px;border-radius:8px;object-fit:cover;flex:none;' })
+              : App.ui.el('div', { style: 'width:34px;height:34px;border-radius:8px;background:var(--color-primary-bg);flex:none;' }),
+            App.ui.el('div', {}, [
+              App.ui.el('strong', {}, [p.name]),
+              App.ui.el('div', { class: 'text-faint mono' }, [p.sku + (p.barcode ? ' · ' + p.barcode : '')])
+            ])
+          ])
         ]),
         App.ui.el('td', {}, [categoryName(p.categoryId)]),
         App.ui.el('td', {}, [supplierName(p.supplierId)]),
@@ -174,6 +181,7 @@
     var historyContainer = App.ui.el('div', { id: 'stock-history' }, [App.ui.el('p', { class: 'text-muted' }, ['Carregando histórico…'])]);
 
     var wrapper = App.ui.el('div', {}, [
+      product.image ? App.ui.el('img', { src: product.image, style: 'width:100%;max-width:220px;border-radius:12px;object-fit:cover;margin-bottom:16px;' }) : null,
       summary,
       App.ui.el('div', { class: 'flex items-center gap-8', style: 'justify-content:space-between; margin-bottom:10px; flex-wrap:wrap;' }, [
         App.ui.el('h4', { style: 'margin:0;' }, ['Histórico de movimentações']),
@@ -341,6 +349,79 @@
     return App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, [label]), select]);
   }
 
+  // Lê um arquivo de imagem, redimensiona (maior lado <= maxDim) e comprime
+  // em JPEG antes de virar data URL — evita gravar fotos de câmera de vários
+  // MB direto no registro do produto (o campo `image` vira parte do JSON
+  // salvo no banco/IndexedDB, então tamanho importa).
+  function readImageAsDataUrl(file, maxDim, quality) {
+    return new Promise(function (resolve, reject) {
+      if (!file) { resolve(null); return; }
+      if (!/^image\//.test(file.type)) { reject(new Error('Selecione um arquivo de imagem (JPG, PNG etc.).')); return; }
+      if (file.size > 15 * 1024 * 1024) { reject(new Error('Imagem muito grande (máximo 15MB). Tente uma foto menor.')); return; }
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error('Não foi possível ler o arquivo.')); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error('Arquivo não é uma imagem válida.')); };
+        img.onload = function () {
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var scale = Math.min(1, maxDim / Math.max(w, h));
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(w * scale));
+          canvas.height = Math.max(1, Math.round(h * scale));
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', quality || 0.82));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Campo de foto: preview + input de arquivo + remover. Retorna { node,
+  // getValue } — getValue() devolve a data URL atual (ou null) na hora de
+  // salvar, já que não é um <input> simples de onde dar .value.
+  function photoField(existingImage) {
+    var current = existingImage || null;
+    var preview = App.ui.el('img', {
+      class: 'product-photo-preview',
+      style: 'width:120px;height:120px;border-radius:12px;object-fit:cover;border:1px solid var(--color-border);' + (current ? '' : 'display:none;')
+    });
+    if (current) preview.src = current;
+
+    var errorEl = App.ui.el('div', { class: 'hint', style: 'color:var(--color-danger);display:none;' });
+    var fileInput = App.ui.el('input', {
+      type: 'file', accept: 'image/*',
+      onchange: function (e) {
+        var file = e.target.files[0];
+        errorEl.style.display = 'none';
+        readImageAsDataUrl(file, 900, 0.82).then(function (dataUrl) {
+          if (!dataUrl) return;
+          current = dataUrl;
+          preview.src = dataUrl;
+          preview.style.display = '';
+          removeBtn.style.display = '';
+        }).catch(function (err) {
+          errorEl.textContent = err.message;
+          errorEl.style.display = '';
+          fileInput.value = '';
+        });
+      }
+    });
+    var removeBtn = App.ui.el('button', {
+      type: 'button', class: 'btn btn-ghost btn-sm', style: current ? '' : 'display:none;',
+      onclick: function () { current = null; preview.style.display = 'none'; fileInput.value = ''; removeBtn.style.display = 'none'; }
+    }, ['Remover foto']);
+
+    var node = App.ui.el('div', { class: 'form-field span-2' }, [
+      App.ui.el('label', {}, ['Foto do produto']),
+      App.ui.el('div', { class: 'flex items-center gap-8', style: 'flex-wrap:wrap;align-items:flex-start;' }, [preview, App.ui.el('div', {}, [fileInput, errorEl])]),
+      removeBtn
+    ]);
+    return { node: node, getValue: function () { return current; } };
+  }
+
   function inputField(id, label, value, opts) {
     opts = opts || {};
     var attrs = Object.assign({ id: id, value: value != null ? value : '' }, opts.attrs || {});
@@ -357,13 +438,16 @@
     var wrapper = App.ui.el('div');
     var errorBox = App.ui.el('div', { class: 'modal-alert hidden' });
     wrapper.appendChild(errorBox);
+    var photo = null; // preenchido depois que o form monta (ver photoField)
 
     Promise.all([App.db.getAll('categories'), App.db.getAll('suppliers')]).then(function (results) {
       var categories = results[0].filter(function (c) { return c.active; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
       var suppliers = results[1].filter(function (s) { return s.active; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
+      photo = photoField(existing && existing.image);
 
       var form = App.ui.el('div', { class: 'form-grid' }, [
         App.ui.el('div', { class: 'form-section-title' }, ['Identificação']),
+        photo.node,
         inputField('p-name', 'Nome comercial *', existing && existing.name, { span2: true, attrs: { placeholder: 'Ex.: Brinco Argola Dourada' } }),
         inputField('p-sku', 'Código / SKU *', (existing && existing.sku) || prefill.sku, { attrs: { placeholder: 'Ex.: BR001' } }),
         inputField('p-barcode', 'Código de barras', (existing && existing.barcode) || prefill.barcode, { attrs: { placeholder: 'Opcional — leitura futura por scanner' } }),
@@ -449,6 +533,7 @@
         record.name = name;
         record.sku = sku;
         record.barcode = readVal('p-barcode') || null;
+        record.image = photo ? photo.getValue() : (record.image || null);
         record.description = record.description || '';
         record.categoryId = readVal('p-category') || null;
         record.supplierId = readVal('p-supplier') || null;
