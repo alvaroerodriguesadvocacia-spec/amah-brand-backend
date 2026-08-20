@@ -8,7 +8,7 @@
  */
 'use strict';
 
-var CACHE_VERSION = 'amah-brand-v1';
+var CACHE_VERSION = 'amah-brand-v2';
 
 var APP_SHELL = [
   './',
@@ -24,6 +24,7 @@ var APP_SHELL = [
   './js/lib/qrcode-generator.js',
   './js/core/idgen.js',
   './js/core/format.js',
+  './js/apiClient.js',
   './js/db.js',
   './js/core/audit.js',
   './js/core/counters.js',
@@ -38,6 +39,7 @@ var APP_SHELL = [
   './js/core/cashEngine.js',
   './js/core/inventoryEngine.js',
   './js/ui.js',
+  './js/auth.js',
   './js/router.js',
   './js/modules/categories.js',
   './js/modules/suppliers.js',
@@ -82,6 +84,18 @@ self.addEventListener('activate', function (event) {
 
 self.addEventListener('fetch', function (event) {
   if (event.request.method !== 'GET') return;
+
+  // Chamadas à API central (Fase 10) nunca passam pelo cache do Service
+  // Worker: os dados são multiusuário e mudam a qualquer momento, então
+  // cache-first serviria informação desatualizada (estoque, caixa, vendas de
+  // outra pessoa). Só o app shell (HTML/CSS/JS/assets) é cache-first.
+  var url = new URL(event.request.url);
+  var isApiCall = url.pathname.indexOf('/api/v1/') === 0 || url.origin !== self.location.origin;
+  if (isApiCall) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(function (cached) {
       var networkFetch = fetch(event.request).then(function (response) {

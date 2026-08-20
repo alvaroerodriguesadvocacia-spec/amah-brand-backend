@@ -144,6 +144,10 @@
 
   var dbPromise = null;
 
+  function apiMode() {
+    return !!(global.App && global.App.api && global.App.api.enabled);
+  }
+
   function openDb() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise(function (resolve, reject) {
@@ -199,26 +203,26 @@
     });
   }
 
-  function getAll(storeName) {
+  function getAllLocal(storeName) {
     return tx([storeName]).then(function (t) {
       return reqToPromise(t.objectStore(storeName).getAll());
     });
   }
 
-  function getById(storeName, id) {
+  function getByIdLocal(storeName, id) {
     return tx([storeName]).then(function (t) {
       return reqToPromise(t.objectStore(storeName).get(id));
     });
   }
 
-  function getByIndex(storeName, indexName, value) {
+  function getByIndexLocal(storeName, indexName, value) {
     return tx([storeName]).then(function (t) {
       var idx = t.objectStore(storeName).index(indexName);
       return reqToPromise(idx.getAll(value));
     });
   }
 
-  function put(storeName, record) {
+  function putLocal(storeName, record) {
     return tx([storeName], 'readwrite').then(function (t) {
       return new Promise(function (resolve, reject) {
         var req = t.objectStore(storeName).put(record);
@@ -229,7 +233,7 @@
     });
   }
 
-  function putMany(storeName, records) {
+  function putManyLocal(storeName, records) {
     return tx([storeName], 'readwrite').then(function (t) {
       return new Promise(function (resolve, reject) {
         var store = t.objectStore(storeName);
@@ -241,7 +245,7 @@
     });
   }
 
-  function remove(storeName, id) {
+  function removeLocal(storeName, id) {
     return tx([storeName], 'readwrite').then(function (t) {
       return new Promise(function (resolve, reject) {
         var req = t.objectStore(storeName).delete(id);
@@ -251,7 +255,7 @@
     });
   }
 
-  function clearStore(storeName) {
+  function clearStoreLocal(storeName) {
     return tx([storeName], 'readwrite').then(function (t) {
       return new Promise(function (resolve, reject) {
         var req = t.objectStore(storeName).clear();
@@ -261,14 +265,10 @@
     });
   }
 
-  function clearAll() {
-    return Promise.all(Object.keys(STORES).map(function (s) { return clearStore(s); }));
-  }
-
-  // Executa uma operação multi-store como transação atômica única.
+  // Executa uma operação multi-store como transação atômica única (modo local).
   // fn recebe o objeto transaction e deve usar t.objectStore(...) diretamente
   // para todas as escritas que precisam ser tudo-ou-nada.
-  function runAtomic(storeNames, mode, fn) {
+  function runAtomicLocal(storeNames, mode, fn) {
     return tx(storeNames, mode).then(function (t) {
       return new Promise(function (resolve, reject) {
         var result;
@@ -286,10 +286,59 @@
     });
   }
 
+  // Versão em modo API do runAtomic: usada apenas pelas operações "simples"
+  // (produto+auditoria, categoria+auditoria etc.) que não têm rota dedicada em
+  // /api/v1/operations/*. fn recebe um objeto com a mesma forma de
+  // t.objectStore(nome).put(registro)/.delete(id), mas as escritas são
+  // enfileiradas e enviadas sequencialmente por HTTP — não há rollback real
+  // se uma falhar no meio (limitação aceita para essas operações de baixo
+  // risco; as operações de negócio complexas — vendas, compras, caixa,
+  // ajuste de inventário — usam as rotas atômicas reais do backend, ver
+  // js/core/*Engine.js).
+  function runAtomicApi(storeNames, mode, fn) {
+    var ops = [];
+    var shim = {
+      objectStore: function (name) {
+        return {
+          put: function (record) { ops.push({ store: name, type: 'put', record: record }); },
+          delete: function (id) { ops.push({ store: name, type: 'delete', id: id }); }
+        };
+      }
+    };
+    var result;
+    try {
+      result = fn(shim);
+    } catch (err) {
+      return Promise.reject(err);
+    }
+    var chain = Promise.resolve();
+    ops.forEach(function (op) {
+      chain = chain.then(function () {
+        return op.type === 'put' ? App.api.store.put(op.store, op.record) : App.api.store.remove(op.store, op.id);
+      });
+    });
+    return chain.then(function () { return result; });
+  }
+
+  function open() {
+    if (apiMode()) return Promise.resolve(true);
+    return openDb();
+  }
+
+  function getAll(storeName) { return apiMode() ? App.api.store.getAll(storeName) : getAllLocal(storeName); }
+  function getById(storeName, id) { return apiMode() ? App.api.store.getById(storeName, id) : getByIdLocal(storeName, id); }
+  function getByIndex(storeName, indexName, value) { return apiMode() ? App.api.store.getByIndex(storeName, indexName, value) : getByIndexLocal(storeName, indexName, value); }
+  function put(storeName, record) { return apiMode() ? App.api.store.put(storeName, record) : putLocal(storeName, record); }
+  function putMany(storeName, records) { return apiMode() ? App.api.store.putMany(storeName, records) : putManyLocal(storeName, records); }
+  function remove(storeName, id) { return apiMode() ? App.api.store.remove(storeName, id) : removeLocal(storeName, id); }
+  function clearStore(storeName) { return apiMode() ? App.api.store.clearStore(storeName) : clearStoreLocal(storeName); }
+  function clearAll() { return Promise.all(Object.keys(STORES).map(function (s) { return clearStore(s); })); }
+  function runAtomic(storeNames, mode, fn) { return apiMode() ? runAtomicApi(storeNames, mode, fn) : runAtomicLocal(storeNames, mode, fn); }
+
   global.App = global.App || {};
   global.App.db = {
     STORES: Object.keys(STORES),
-    open: openDb,
+    open: open,
     tx: tx,
     getAll: getAll,
     getById: getById,

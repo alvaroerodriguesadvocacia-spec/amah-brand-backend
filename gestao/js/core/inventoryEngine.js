@@ -58,6 +58,7 @@
   // Confirma ajustes apenas para os itens informados em itemIds (permite ajustar
   // seletivamente). Gera ENTRADA_AJUSTE ou SAIDA_AJUSTE conforme a diferença.
   function confirmAdjustments(stockCountId, itemIds) {
+    if (App.api && App.api.enabled) return App.api.operations.inventoryCountConfirmAdjustments(stockCountId, itemIds);
     return getDivergences(stockCountId).then(function (allItems) {
       var toAdjust = allItems.filter(function (i) { return itemIds.indexOf(i.id) !== -1 && i.difference !== 0; });
       if (toAdjust.length === 0) return Promise.resolve([]);

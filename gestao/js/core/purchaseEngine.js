@@ -10,6 +10,7 @@
   function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 
   function createPurchase(params) {
+    if (App.api && App.api.enabled) return App.api.operations.purchasesCreate(params);
     var items = params.items || [];
     if (!params.supplierId) return Promise.reject(new Error('Selecione um fornecedor.'));
     if (items.length === 0) return Promise.reject(new Error('Adicione ao menos um item à compra.'));
@@ -64,6 +65,7 @@
   // receivedQtyByItemId: { purchaseItemId: qtyRecebidaAgora }
   function receivePurchase(purchaseId, receivedQtyByItemId, options) {
     options = options || {};
+    if (App.api && App.api.enabled) return App.api.operations.purchasesReceive(purchaseId, { receivedQtyByItemId: receivedQtyByItemId, options: options });
     return Promise.all([
       App.db.getById('purchases', purchaseId),
       App.db.getByIndex('purchase_items', 'purchaseId', purchaseId),
@@ -139,6 +141,7 @@
   }
 
   function cancelPurchase(purchaseId, reason) {
+    if (App.api && App.api.enabled) return App.api.operations.purchasesCancel(purchaseId, reason);
     return App.db.getById('purchases', purchaseId).then(function (purchase) {
       if (!purchase) throw new Error('Compra não encontrada.');
       if (purchase.status === 'recebido') throw new Error('Não é possível cancelar uma compra já totalmente recebida.');

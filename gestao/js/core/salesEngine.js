@@ -24,6 +24,7 @@
   }
 
   function finalizeSale(params) {
+    if (App.api && App.api.enabled) return App.api.operations.salesFinalize(params);
     var items = params.items || [];
     var payments = params.payments || [];
     if (items.length === 0) return Promise.reject(new Error('A venda precisa ter ao menos um item no carrinho.'));
@@ -177,6 +178,7 @@
   }
 
   function cancelSale(saleId, reason) {
+    if (App.api && App.api.enabled) return App.api.operations.salesCancel(saleId, reason);
     if (!reason || !reason.trim()) return Promise.reject(new Error('Informe o motivo do cancelamento.'));
     return Promise.all([
       App.db.getById('sales', saleId),
@@ -238,6 +240,7 @@
   // vinculada à venda original (simplificação documentada no LEIAME).
   function returnSaleItem(params) {
     var saleItemId = params.saleItemId, qty = Number(params.qty), reason = params.reason;
+    if (App.api && App.api.enabled) return App.api.operations.salesItemReturn(saleItemId, { qty: qty, reason: reason });
     if (!reason || !reason.trim()) return Promise.reject(new Error('Informe o motivo da devolução.'));
     return Promise.all([
       App.db.getById('sale_items', saleItemId),

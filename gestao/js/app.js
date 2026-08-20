@@ -209,7 +209,10 @@
 
   function boot() {
     registerServiceWorker();
-    App.db.open().then(function () {
+    var authGate = (App.api && App.api.enabled) ? App.auth.ensureAuthenticated() : Promise.resolve();
+    authGate.then(function () {
+      return App.db.open();
+    }).then(function () {
       return App.db.getById('settings', 'app_meta');
     }).then(function (meta) {
       if (meta && meta.initialized) {
@@ -282,14 +285,14 @@
       '      <div><div class="brand-name">AMÁH <span style="font-weight:400;opacity:.85;">Brand</span></div><div class="brand-sub">Gestão completa</div></div>' +
       '    </div>' +
       '    <nav class="sidebar-nav" id="sidebar-nav"></nav>' +
-      '    <div class="sidebar-footer">v0.1.0 · dados salvos neste dispositivo</div>' +
+      '    <div class="sidebar-footer">v0.1.0 · ' + (App.api && App.api.enabled ? 'dados salvos na nuvem AMÁH' : 'dados salvos neste dispositivo') + '</div>' +
       '  </aside>' +
       '  <div class="main-area">' +
       '    <header class="topbar">' +
       '      <button class="topbar-menu-btn" id="menu-toggle-btn">☰</button>' +
       '      <div class="global-search"><span class="icon">🔍</span><input id="global-search-input" placeholder="Buscar produto por nome, SKU ou código de barras…" /></div>' +
       '      <div class="topbar-spacer"></div>' +
-      '      <div class="topbar-actions"><span class="env-badge" id="demo-badge" style="display:none;">DEMONSTRAÇÃO</span></div>' +
+      '      <div class="topbar-actions"><span class="env-badge" id="demo-badge" style="display:none;">DEMONSTRAÇÃO</span><span id="user-badge"></span></div>' +
       '    </header>' +
       '    <main class="view-container" id="view-container"></main>' +
       '  </div>' +
@@ -299,6 +302,25 @@
     document.getElementById('menu-toggle-btn').addEventListener('click', openSidebarMobile);
     buildSidebar();
     setupGlobalSearch();
+    renderUserBadge();
+  }
+
+  function renderUserBadge() {
+    var slot = document.getElementById('user-badge');
+    if (!slot) return;
+    slot.innerHTML = '';
+    if (!(App.api && App.api.enabled)) return;
+    var user = App.api.getUser();
+    slot.appendChild(App.ui.el('span', { class: 'flex items-center gap-8', style: 'font-size:13px;' }, [
+      App.ui.el('span', { class: 'text-muted' }, [(user && (user.name || user.email)) || '']),
+      App.ui.el('button', {
+        class: 'btn btn-ghost btn-sm', onclick: function () {
+          App.ui.confirmDialog({ title: 'Sair', message: 'Deseja sair da sua conta?', confirmLabel: 'Sair' }).then(function (ok) {
+            if (ok) App.auth.logout();
+          });
+        }
+      }, ['Sair'])
+    ]));
   }
 
   function refreshDemoBadge() {

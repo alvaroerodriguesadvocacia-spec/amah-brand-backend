@@ -17,6 +17,7 @@
   }
 
   function openSession(openingBalance, notes) {
+    if (App.api && App.api.enabled) return App.api.operations.cashOpen({ openingBalance: openingBalance, notes: notes });
     return getOpenSession().then(function (existing) {
       if (existing) throw new Error('Já existe um caixa aberto (desde ' + fmt.dateTimeBR(existing.openedAt) + '). Feche-o antes de abrir um novo.');
       var balance = App.core.validation.positiveNumber(openingBalance, 'Saldo inicial', true);
@@ -45,6 +46,7 @@
 
   function registerMovement(params) {
     var type = params.type;
+    if (App.api && App.api.enabled) return App.api.operations.cashMovement(params);
     if (!DIRECTION_BY_TYPE.hasOwnProperty(type)) return Promise.reject(new Error('Tipo de movimentação de caixa inválido: ' + type));
     var amount = Number(params.amount);
     if (!isFinite(amount) || amount <= 0) return Promise.reject(new Error('O valor deve ser maior que zero.'));
@@ -63,6 +65,7 @@
   }
 
   function closeSession(sessionId, closingBalanceInformed, notes) {
+    if (App.api && App.api.enabled) return App.api.operations.cashClose(sessionId, { closingBalanceInformed: closingBalanceInformed, notes: notes });
     return computeBalance(sessionId).then(function (result) {
       var session = result.session;
       if (session.status !== 'aberto') throw new Error('Este caixa já está fechado.');
