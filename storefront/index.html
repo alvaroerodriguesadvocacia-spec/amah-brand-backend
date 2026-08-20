@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amáh — loja</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@300;400;500;600&display=swap');
+  :root{
+    --rose:#B97D75;--rose-track:#A96B63;--rose-escuro:#8A5049;--champanhe:#F4DD9B;
+    --ouro:#C7A254;--marfim:#FAF4EC;--carta:#FFFDF9;--tinta:#4E332F;--tinta-suave:#8E6A62;
+    --hair:rgba(78,51,47,.14);--hair-ouro:rgba(199,162,84,.4);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:'Jost',system-ui,sans-serif;background:radial-gradient(120% 90% at 50% -10%,#C88F86 0%,#B97D75 55%,#A2685F 100%);color:var(--tinta);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:28px 14px;-webkit-font-smoothing:antialiased}
+  .phone{width:100%;max-width:392px;height:812px;max-height:calc(100vh - 40px);background:var(--marfim);border-radius:44px;box-shadow:0 30px 70px -20px rgba(80,45,40,.5),0 0 0 10px #2a2024,0 0 0 12px #4a3b40;overflow:hidden;position:relative;display:flex;flex-direction:column}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:26px;background:#2a2024;border-radius:0 0 18px 18px;z-index:40}
+  .topbar{background:var(--rose);padding:40px 22px 16px;flex-shrink:0;text-align:center;position:relative}
+  .sparkle{color:var(--champanhe);font-size:13px;letter-spacing:2px;opacity:.9}
+  .brandrow{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:2px}
+  .heart{height:38px;width:auto;display:block}
+  .wordmark{font-family:'Cinzel',serif;font-weight:500;font-size:34px;letter-spacing:3px;color:var(--champanhe);line-height:1;text-shadow:1px 2px 0 rgba(138,80,73,.35)}
+  .tagline{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:var(--champanhe);opacity:.92;margin-top:6px}
+  .cartbtn{position:absolute;top:44px;right:20px;width:40px;height:40px;border-radius:50%;background:var(--rose-track);border:1px solid rgba(244,221,155,.35);color:var(--champanhe);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:5}
+  .cartbtn svg{width:19px;height:19px;stroke:var(--champanhe);stroke-width:1.7;fill:none}
+  .badge{position:absolute;top:-4px;right:-4px;min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:var(--champanhe);color:var(--rose-escuro);font-size:11px;font-weight:600;display:none;align-items:center;justify-content:center}
+  .badge.show{display:flex}
+  .seg{margin-top:16px;display:flex;background:var(--rose-track);border-radius:999px;padding:4px;gap:4px}
+  .seg button{flex:1;border:none;background:transparent;font-family:'Jost';font-weight:500;font-size:13px;letter-spacing:.06em;color:var(--champanhe);padding:9px 0;border-radius:999px;cursor:pointer;transition:.25s}
+  .seg button.on{background:var(--marfim);color:var(--rose-escuro);box-shadow:0 6px 14px -6px rgba(80,45,40,.5)}
+  .screen{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--marfim)}
+  .screen::-webkit-scrollbar{width:0}
+  .view{display:none;padding:6px 18px 30px;animation:fade .35s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .sectlabel{display:flex;align-items:center;gap:12px;margin:20px 4px 14px;font-family:'Jost';font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--ouro);font-weight:500}
+  .sectlabel::before,.sectlabel::after{content:"";flex:1;height:1px;background:var(--hair-ouro)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:var(--carta);border:1px solid var(--hair);border-radius:20px;overflow:hidden;cursor:pointer;position:relative;transition:transform .25s,box-shadow .25s}
+  .card:hover{transform:translateY(-3px);box-shadow:0 16px 30px -18px rgba(80,45,40,.4)}
+  .thumb{aspect-ratio:1/1.05;display:flex;align-items:center;justify-content:center;background:radial-gradient(90% 90% at 30% 20%,#FFFDF8 0%,#F3EADD 100%);position:relative;background-size:cover;background-position:center}
+  .thumb svg{width:52%;height:52%;stroke:var(--ouro);stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .tagdot{position:absolute;top:10px;right:10px;width:9px;height:9px;border-radius:50%;background:var(--ouro);box-shadow:0 0 0 3px rgba(199,162,84,.2)}
+  .tagdot.low{background:var(--rose-track);box-shadow:0 0 0 3px rgba(169,107,99,.28)}
+  .cardfoot{padding:11px 13px 14px}
+  .cardfoot h3{font-family:'Jost';font-weight:400;font-size:12.5px;line-height:1.3;color:var(--tinta);margin-bottom:5px}
+  .price{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:19px;color:var(--tinta)}
+  .price small{font-size:11px;color:var(--tinta-suave);font-family:'Jost';font-weight:400}
+  /* overlay (detalhe + sacola) */
+  .overlay{position:absolute;inset:0;background:var(--marfim);z-index:30;transform:translateX(100%);transition:transform .34s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+  .overlay.open{transform:none}
+  .back{position:absolute;top:46px;left:18px;z-index:5;background:var(--carta);border:1px solid var(--hair);width:38px;height:38px;border-radius:50%;font-size:19px;cursor:pointer;color:var(--rose-escuro);display:flex;align-items:center;justify-content:center}
+  .hero{aspect-ratio:1/1;background:radial-gradient(90% 90% at 35% 25%,#FFFDF8 0%,#F1E7DA 100%);display:flex;align-items:center;justify-content:center;flex-shrink:0;background-size:cover;background-position:center}
+  .hero svg{width:44%;height:44%;stroke:var(--ouro);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .dbody{padding:22px;overflow-y:auto;flex:1}
+  .dbody .kick{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--ouro);font-weight:500}
+  .dbody h2{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:30px;margin:6px 0 4px;line-height:1.1;color:var(--tinta)}
+  .dbody .dprice{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:28px;margin:10px 0 16px;color:var(--tinta)}
+  .whytitle{font-family:'Cormorant Garamond',serif;font-style:italic;font-weight:600;font-size:19px;color:var(--rose-escuro);margin-bottom:8px}
+  .dbody p{font-size:13.5px;line-height:1.7;color:var(--tinta-suave);font-weight:300;margin-bottom:14px;white-space:pre-line}
+  .chips{display:flex;gap:8px;margin:4px 0 20px;flex-wrap:wrap}
+  .chip{font-size:11px;border:1px solid var(--hair-ouro);border-radius:999px;padding:6px 13px;color:var(--tinta-suave);letter-spacing:.04em}
+  .addbtn{width:100%;border:none;background:var(--rose);color:var(--champanhe);font-family:'Jost';font-weight:500;font-size:14px;letter-spacing:.05em;padding:16px;border-radius:16px;cursor:pointer}
+  .addbtn:disabled{opacity:.5;cursor:default}
+  /* sacola */
+  .cartwrap{padding:70px 20px 20px;overflow-y:auto;flex:1}
+  .carttitle{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:26px;color:var(--tinta);text-align:center;margin-bottom:4px}
+  .cartsub{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:13px;color:var(--tinta-suave);text-align:center;margin-bottom:20px}
+  .citem{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--hair)}
+  .cthumb{width:52px;height:52px;border-radius:12px;background:radial-gradient(90% 90% at 30% 20%,#FFFDF8,#F1E7DA);display:flex;align-items:center;justify-content:center;flex-shrink:0;background-size:cover;background-position:center}
+  .cthumb svg{width:56%;height:56%;stroke:var(--ouro);stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .cinfo{flex:1;min-width:0}
+  .cinfo h4{font-size:12.5px;font-weight:400;color:var(--tinta)}
+  .cinfo span{font-size:11px;color:var(--tinta-suave)}
+  .cinfo .cprice{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:15px;color:var(--tinta);margin-top:2px}
+  .cstep{display:flex;align-items:center;gap:9px}
+  .cstep button{width:28px;height:28px;border-radius:8px;border:1px solid var(--hair);background:var(--marfim);color:var(--rose-escuro);font-size:16px;cursor:pointer;line-height:1}
+  .cstep b{font-size:13px;min-width:16px;text-align:center}
+  .cartempty{text-align:center;color:var(--tinta-suave);font-style:italic;font-family:'Cormorant Garamond',serif;font-size:16px;margin-top:60px}
+  .totalrow{display:flex;justify-content:space-between;align-items:baseline;margin:18px 2px}
+  .totalrow span{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--tinta-suave)}
+  .totalrow b{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:26px;color:var(--tinta)}
+  .namefield{width:100%;font-family:'Jost';font-size:14px;color:var(--tinta);background:var(--carta);border:1px solid var(--hair);border-radius:13px;padding:13px;outline:none;margin-bottom:12px}
+  .namefield:focus{border-color:var(--ouro);box-shadow:0 0 0 3px rgba(199,162,84,.14)}
+  .checkout{width:100%;border:none;background:var(--rose-escuro);color:var(--champanhe);font-family:'Jost';font-weight:500;font-size:14px;letter-spacing:.04em;padding:16px;border-radius:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px}
+  .checkout svg{width:17px;height:17px;stroke:currentColor;stroke-width:2;fill:none}
+  .checkout:disabled{opacity:.5;cursor:default}
+  /* LOJA (cadastro) */
+  .photobox{background:var(--carta);border:1px solid var(--hair);border-radius:22px;padding:14px;margin-bottom:16px}
+  .frame{aspect-ratio:1/.86;border-radius:16px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:linear-gradient(135deg,#EBDCCF,#DEC9BC);transition:.5s;cursor:pointer}
+  .frame svg{width:40%;height:40%;stroke:var(--rose-escuro);stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round;transition:.5s;opacity:.6}
+  .frame .flabel{position:absolute;bottom:10px;left:12px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--rose-escuro);font-weight:500;background:rgba(255,253,249,.85);padding:5px 10px;border-radius:999px}
+  .frame.done{background:radial-gradient(85% 85% at 32% 22%,#FFFDF8 0%,#F2E8DA 100%)}
+  .frame.done svg{stroke:var(--ouro);opacity:1}
+  .frame.hasphoto{background-size:cover;background-position:center}.frame.hasphoto svg{display:none}
+  .shimmer::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.75) 50%,transparent 80%);animation:sweep 1s ease}
+  @keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  .genbtn{margin-top:12px;width:100%;border:1px solid var(--ouro);background:linear-gradient(180deg,#FBF3DF,#F4E9CE);color:var(--rose-escuro);font-family:'Jost';font-weight:500;font-size:13px;letter-spacing:.03em;padding:14px;border-radius:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+  .genbtn:disabled{opacity:.6;cursor:default}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--tinta-suave);font-weight:500;margin-bottom:7px}
+  .field input,.field textarea,.field select{width:100%;font-family:'Jost';font-size:14px;font-weight:400;color:var(--tinta);background:var(--carta);border:1px solid var(--hair);border-radius:13px;padding:12px 13px;outline:none;transition:.2s}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--ouro);box-shadow:0 0 0 3px rgba(199,162,84,.14)}
+  .field textarea{resize:none;line-height:1.5}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .margem{font-family:'Jost';font-size:11.5px;color:var(--ouro);font-weight:500;margin-top:7px}
+  .stock{display:flex;align-items:center;justify-content:space-between;background:var(--carta);border:1px solid var(--hair);border-radius:13px;padding:8px 12px}
+  .stepper{display:flex;align-items:center;gap:14px}
+  .stepper button{width:36px;height:36px;border-radius:10px;border:1px solid var(--hair);background:var(--marfim);font-size:20px;color:var(--rose-escuro);cursor:pointer;line-height:1}
+  .stepper b{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:24px;min-width:34px;text-align:center;color:var(--tinta)}
+  .steplbl{font-size:9px;color:var(--tinta-suave);text-transform:uppercase;letter-spacing:.14em}
+  .caphead{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+  .caphead label{margin:0}
+  .minigen{font-family:'Jost';font-size:11px;color:var(--ouro);font-weight:500;background:none;border:none;cursor:pointer;display:flex;gap:5px;align-items:center}
+  .savebar{display:flex;gap:10px;margin-top:8px}
+  .savebar button{flex:1;font-family:'Jost';font-weight:500;font-size:13.5px;letter-spacing:.03em;padding:15px;border-radius:14px;cursor:pointer}
+  .savebar button:disabled{opacity:.55;cursor:default}
+  .ghost{background:transparent;border:1px solid var(--rose);color:var(--rose-escuro)}
+  .solid{background:var(--rose);border:1px solid var(--rose);color:var(--champanhe)}
+  .stitem{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--hair)}
+  .stitem:last-child{border-bottom:none}
+  .stthumb{width:44px;height:44px;border-radius:12px;background:radial-gradient(90% 90% at 30% 20%,#FFFDF8,#F1E7DA);display:flex;align-items:center;justify-content:center;flex-shrink:0;background-size:cover;background-position:center}
+  .stthumb svg{width:56%;height:56%;stroke:var(--ouro);stroke-width:2.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .stinfo{flex:1}.stinfo h4{font-size:12.5px;font-weight:400;color:var(--tinta)}.stinfo span{font-size:11px;color:var(--tinta-suave)}
+  .qty{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:20px;color:var(--tinta)}.qty.low{color:var(--rose-track)}
+  .toast{position:absolute;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--rose-escuro);color:var(--champanhe);font-family:'Jost';font-size:12.5px;padding:13px 20px;border-radius:999px;z-index:60;opacity:0;transition:.4s;white-space:nowrap;box-shadow:0 12px 24px -10px rgba(0,0,0,.5)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .statemsg{text-align:center;padding:60px 20px;color:var(--tinta-suave);font-family:'Cormorant Garamond',serif;font-style:italic;font-size:16px;grid-column:1/-1}
+  .loginwrap{padding:60px 22px}
+  .loginwrap h2{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:24px;color:var(--tinta);text-align:center;margin-bottom:6px}
+  .loginwrap p{font-family:'Jost';font-size:12px;color:var(--tinta-suave);text-align:center;margin-bottom:22px}
+  .loginerr{font-size:11.5px;color:#a33;text-align:center;margin-top:-6px;margin-bottom:12px;min-height:14px}
+  .whoami{display:flex;align-items:center;justify-content:space-between;background:var(--carta);border:1px solid var(--hair);border-radius:13px;padding:10px 13px;margin-bottom:16px;font-size:11.5px;color:var(--tinta-suave)}
+  .whoami button{background:none;border:none;color:var(--rose-escuro);font-family:'Jost';font-weight:500;font-size:11px;cursor:pointer;text-decoration:underline}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media (max-width:430px){.phone{height:calc(100vh - 24px);border-radius:36px}}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+  <div class="topbar">
+    <div class="cartbtn" onclick="openCart()">
+      <svg viewBox="0 0 24 24"><path d="M6 7h12l-1 13H7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
+      <span class="badge" id="badge">0</span>
+    </div>
+    <div class="sparkle">&#10022;&#10023;</div>
+    <div class="brandrow">
+      <svg class="heart" viewBox="0 0 100 90" aria-hidden="true"><path d="M50 82C22 62 8 44 8 27 8 13 19 3 32 3c9 0 15 5 18 12 3-7 9-12 18-12 13 0 24 10 24 24 0 17-14 35-42 55z" fill="none" stroke="var(--champanhe)" stroke-width="4.5" stroke-linejoin="round"/></svg>
+      <div class="wordmark">AM&Aacute;H</div>
+    </div>
+    <div class="tagline">Acess&oacute;rios que elevam a sua ess&ecirc;ncia</div>
+    <div class="seg">
+      <button id="tab-vit" class="on" onclick="setTab('vit')">Vitrine</button>
+      <button id="tab-loja" onclick="setTab('loja')">Loja</button>
+    </div>
+  </div>
+  <div class="screen">
+    <div id="view-vit" class="view active">
+      <div class="sectlabel">Novidades</div>
+      <div class="grid" id="grid"><div class="statemsg">Carregando peças&hellip;</div></div>
+    </div>
+    <div id="view-loja" class="view">
+      <div id="loja-content"><div class="statemsg">Carregando&hellip;</div></div>
+    </div>
+  </div>
+  <!-- detalhe -->
+  <div class="overlay" id="detail">
+    <button class="back" onclick="closeDetail()">&lsaquo;</button>
+    <div class="hero" id="d-hero"></div>
+    <div class="dbody">
+      <div class="kick" id="d-kick"></div>
+      <h2 id="d-nome"></h2>
+      <div class="dprice" id="d-preco"></div>
+      <div class="whytitle">Por que voc&ecirc; vai Am&aacute;hr essa pe&ccedil;a?</div>
+      <p id="d-desc"></p>
+      <div class="chips" id="d-chips"></div>
+      <button class="addbtn" id="d-add">Adicionar &agrave; sacola</button>
+    </div>
+  </div>
+  <!-- sacola -->
+  <div class="overlay" id="cart">
+    <button class="back" onclick="closeCart()">&lsaquo;</button>
+    <div class="cartwrap">
+      <div class="carttitle">Sua sacola</div>
+      <div class="cartsub">cada detalhe conta uma hist&oacute;ria</div>
+      <div id="cartitems"></div>
+      <div id="cartfoot" style="display:none">
+        <div class="totalrow"><span>Total</span><b id="carttotal">R$ 0,00</b></div>
+        <input class="namefield" id="cart-nome" placeholder="Seu nome"/>
+        <button class="checkout" id="checkoutbtn" onclick="checkout()">
+          <svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-4-1L3 20l1-5.5a8.5 8.5 0 1 1 17-3z"/></svg>
+          Enviar pedido no WhatsApp
+        </button>
+      </div>
+      <div class="cartempty" id="cartempty">Sua sacola est&aacute; vazia por enquanto.</div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+<script>
+  /* ============================================================
+   * AMÁH Brand — Vitrine (loja on-line) — Fase 10
+   *
+   * Este arquivo é a adaptação do artefato de design entregue pela marca,
+   * agora conectado ao backend central (backend/) em vez de dados fixos.
+   * A aba "Vitrine" é 100% pública (sem login) e lê o catálogo real —
+   * produto, preço e ESTOQUE são os mesmos do sistema de gestão interno,
+   * calculados pela mesma "Regra de Ouro do Estoque".
+   * A aba "Loja" fica atrás de um login (mesmo usuário do sistema de
+   * gestão) e publica peças de verdade no catálogo compartilhado.
+   * ============================================================ */
+
+  // Troque pela URL pública do backend quando publicar em produção.
+  // Em desenvolvimento local, o backend roda em http://localhost:8787.
+  var API_BASE = (window.AMAH_API_BASE) || 'https://amah-brand-backend.onrender.com';
+  // Troque pelo WhatsApp da Amáh (só números, com 55 + DDD).
+  var WHATS = '5511993988975';
+
+  var ICONS = {
+    argola:'<circle cx="12" cy="14" r="6"/><path d="M12 8V4M9 4h6"/>',
+    colar:'<path d="M4 5c3 7 13 7 16 0"/><circle cx="12" cy="17" r="2.4"/>',
+    bolsa:'<path d="M6 9h12l-1 10H7z"/><path d="M9 9a3 3 0 0 1 6 0"/>',
+    oculos:'<circle cx="7.5" cy="14" r="3.5"/><circle cx="16.5" cy="14" r="3.5"/><path d="M11 14h2M4 11l2-1M20 11l-2-1"/>',
+    anel:'<circle cx="12" cy="15" r="5"/><path d="M9.5 10.5 12 6l2.5 4.5"/>',
+    presilha:'<rect x="5" y="9" width="14" height="6" rx="3"/><path d="M8 12h8"/>',
+    gema:'<path d="M7 4h10l4 6-9 10L3 10z"/><path d="M3 10h18M9 4l3 6-3 10M15 4l-3 6 3 10"/>'
+  };
+
+  function iconFor(p) {
+    var text = ((p.categoryName || '') + ' ' + (p.name || '')).toLowerCase();
+    if (text.indexOf('brinco') !== -1 || text.indexOf('argola') !== -1) return 'argola';
+    if (text.indexOf('colar') !== -1 || text.indexOf('gargantilha') !== -1) return 'colar';
+    if (text.indexOf('bolsa') !== -1) return 'bolsa';
+    if (text.indexOf('óculos') !== -1 || text.indexOf('oculos') !== -1) return 'oculos';
+    if (text.indexOf('anel') !== -1) return 'anel';
+    if (text.indexOf('presilha') !== -1 || text.indexOf('tiara') !== -1) return 'presilha';
+    return 'gema';
+  }
+
+  function brl(v){return 'R$ '+(Number(v)||0).toFixed(2).replace('.',',')}
+
+  // ---------------- estado ----------------
+  var produtos = [];   // catálogo público (vindo da API)
+  var produtosById = {};
+  var cart = {};        // { productId: qty }
+  var authToken = null; // presente somente após login na aba Loja
+
+  // ---------------- Vitrine: carregar catálogo ----------------
+  function loadCatalogo() {
+    var grid = document.getElementById('grid');
+    grid.innerHTML = '<div class="statemsg">Carregando peças&hellip;</div>';
+    fetch(API_BASE + '/api/v1/public/products')
+      .then(function (r) { if (!r.ok) throw new Error('status ' + r.status); return r.json(); })
+      .then(function (list) {
+        produtos = list;
+        produtosById = {};
+        produtos.forEach(function (p) { produtosById[p.id] = p; });
+        renderGrid();
+      })
+      .catch(function (err) {
+        grid.innerHTML = '<div class="statemsg">Não foi possível carregar o catálogo agora.<br>Tente novamente em instantes. &#9825;</div>';
+        console.error('Falha ao carregar catálogo:', err);
+      });
+  }
+
+  function renderGrid() {
+    var grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    if (produtos.length === 0) {
+      grid.innerHTML = '<div class="statemsg">Ainda não há peças publicadas na vitrine.</div>';
+      return;
+    }
+    produtos.forEach(function (p) {
+      var low = p.stock > 0 && p.stock <= 3;
+      var esgotado = p.stock <= 0;
+      var el = document.createElement('div');
+      el.className = 'card';
+      el.onclick = function () { openDetail(p.id) };
+      var thumbStyle = p.image ? ' style="background-image:url(\'' + p.image.replace(/'/g,"%27") + '\')"' : '';
+      el.innerHTML = '<div class="thumb"' + thumbStyle + '>' +
+        (esgotado ? '' : '<span class="tagdot ' + (low ? 'low' : '') + '"></span>') +
+        (p.image ? '' : '<svg viewBox="0 0 24 24">' + ICONS[iconFor(p)] + '</svg>') + '</div>' +
+        '<div class="cardfoot"><h3>' + escapeHtml(p.name) + (esgotado ? ' <span style="color:var(--rose-track)">(esgotado)</span>' : '') + '</h3>' +
+        '<div class="price"><small>R$</small> ' + Number(p.price).toFixed(2).replace('.', ',') + '</div></div>';
+      grid.appendChild(el);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function setTab(t){
+    document.getElementById('tab-vit').classList.toggle('on',t==='vit');
+    document.getElementById('tab-loja').classList.toggle('on',t==='loja');
+    document.getElementById('view-vit').classList.toggle('active',t==='vit');
+    document.getElementById('view-loja').classList.toggle('active',t==='loja');
+    document.querySelector('.screen').scrollTop=0;
+    if (t === 'loja') renderLoja();
+  }
+
+  var curId = null;
+  function openDetail(id){
+    curId = id; var p = produtosById[id];
+    if (!p) return;
+    document.getElementById('d-hero').innerHTML = p.image
+      ? '' : '<svg viewBox="0 0 24 24">' + ICONS[iconFor(p)] + '</svg>';
+    document.getElementById('d-hero').style.backgroundImage = p.image ? "url('" + p.image.replace(/'/g,"%27") + "')" : '';
+    document.getElementById('d-kick').textContent = p.categoryName || 'Peça Amáh';
+    document.getElementById('d-nome').textContent = p.name;
+    document.getElementById('d-preco').textContent = brl(p.price);
+    document.getElementById('d-desc').textContent = p.description && p.description.trim()
+      ? p.description
+      : 'Uma peça pensada para acompanhar você em cada detalhe do seu dia — leveza, brilho e presença, do jeito Amáh de ser.';
+    var chips = [];
+    if (p.color) chips.push('<span class="chip">' + escapeHtml(p.color) + '</span>');
+    chips.push('<span class="chip">' + (p.stock > 3 ? 'Pronta entrega' : (p.stock > 0 ? 'Últimas unidades' : 'Esgotado — em reposição')) + '</span>');
+    document.getElementById('d-chips').innerHTML = chips.join('');
+    var addBtn = document.getElementById('d-add');
+    addBtn.disabled = p.stock <= 0;
+    addBtn.textContent = p.stock <= 0 ? 'Esgotado no momento' : 'Adicionar à sacola';
+    addBtn.onclick = function(){ addToCart(id) };
+    document.getElementById('detail').classList.add('open');
+  }
+  function closeDetail(){document.getElementById('detail').classList.remove('open')}
+
+  function addToCart(id){
+    var p = produtosById[id];
+    var atual = cart[id] || 0;
+    if (p && atual + 1 > p.stock) { toast('Só temos ' + p.stock + ' unidade(s) dessa peça no momento'); return; }
+    cart[id] = atual + 1;
+    updateBadge();
+    toast('Adicionado à sacola 💛');
+  }
+  function updateBadge(){
+    var n=0;for(var k in cart)n+=cart[k];
+    var b=document.getElementById('badge');b.textContent=n;b.classList.toggle('show',n>0);
+  }
+  function openCart(){renderCart();document.getElementById('cart').classList.add('open')}
+  function closeCart(){document.getElementById('cart').classList.remove('open')}
+  function cartStep(id,d){
+    var p = produtosById[id];
+    var next = (cart[id]||0) + d;
+    if (p && next > p.stock) { toast('Só temos ' + p.stock + ' unidade(s) dessa peça'); return; }
+    cart[id]=next; if(cart[id]<=0)delete cart[id];updateBadge();renderCart()
+  }
+  function renderCart(){
+    var wrap=document.getElementById('cartitems');wrap.innerHTML='';
+    var keys=Object.keys(cart);var total=0;
+    document.getElementById('cartempty').style.display=keys.length?'none':'block';
+    document.getElementById('cartfoot').style.display=keys.length?'block':'none';
+    keys.forEach(function(id){
+      var p=produtosById[id];if(!p)return;var q=cart[id];total+=p.price*q;
+      var el=document.createElement('div');el.className='citem';
+      var thumbStyle = p.image ? ' style="background-image:url(\'' + p.image.replace(/'/g,"%27") + '\')"' : '';
+      el.innerHTML='<div class="cthumb"' + thumbStyle + '>' + (p.image ? '' : '<svg viewBox="0 0 24 24">'+ICONS[iconFor(p)]+'</svg>') + '</div>'+
+        '<div class="cinfo"><h4>'+escapeHtml(p.name)+'</h4><span>'+escapeHtml(p.color||'')+'</span><div class="cprice">'+brl(p.price)+'</div></div>'+
+        '<div class="cstep"><button onclick="cartStep(\''+id+'\',-1)">&minus;</button><b>'+q+'</b><button onclick="cartStep(\''+id+'\',1)">+</button></div>';
+      wrap.appendChild(el);
+    });
+    document.getElementById('carttotal').textContent=brl(total);
+  }
+  function checkout(){
+    var keys=Object.keys(cart);if(!keys.length)return;
+    var nome=document.getElementById('cart-nome').value.trim();
+    var total=0,linhas='', items=[];
+    keys.forEach(function(id){var p=produtosById[id],q=cart[id];if(!p)return;total+=p.price*q;
+      linhas+='• '+p.name+' ('+(p.color||'—')+') — '+q+'x — '+brl(p.price*q)+'\n';
+      items.push({ productId: id, name: p.name, color: p.color || '', qty: q, unitPrice: p.price });
+    });
+    var msg='Olá! 💛 Esse é o meu carrinho com minhas compras, preciso de atendimento:\n\n'+linhas+'\nTotal: '+brl(total)+(nome?'\n\nMeu nome: '+nome:'');
+
+    // Registra o pedido no backend (best-effort — não bloqueia o WhatsApp se falhar)
+    fetch(API_BASE + '/api/v1/public/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerName: nome || null, items: items })
+    }).catch(function (err) { console.warn('Não foi possível registrar o pedido no backend:', err); });
+
+    window.open('https://wa.me/'+WHATS+'?text='+encodeURIComponent(msg),'_blank');
+    toast('Abrindo o WhatsApp…');
+  }
+
+  // ---------------- Loja (área da equipe Amáh — precisa de login) ----------------
+  function renderLoja() {
+    var content = document.getElementById('loja-content');
+    if (!authToken) {
+      content.innerHTML =
+        '<div class="loginwrap">' +
+        '  <h2>Área da equipe</h2>' +
+        '  <p>Entre com o login do sistema de gestão para publicar peças direto da loja.</p>' +
+        '  <div class="field"><label>E-mail</label><input id="login-email" type="email"/></div>' +
+        '  <div class="field"><label>Senha</label><input id="login-senha" type="password"/></div>' +
+        '  <div class="loginerr" id="login-err"></div>' +
+        '  <button class="checkout" style="background:var(--rose)" onclick="doLogin()">Entrar</button>' +
+        '</div>';
+      return;
+    }
+    content.innerHTML =
+      '<div class="whoami"><span>Conectada(o) como <b id="who-email"></b></span><button onclick="doLogout()">Sair</button></div>' +
+      '<div class="sectlabel">Nova peça</div>' +
+      '<div class="photobox">' +
+      '  <input type="file" accept="image/*" id="fileInput" style="display:none" onchange="loadPhoto(event)">' +
+      '  <div class="frame" id="frame" onclick="document.getElementById(\'fileInput\').click()"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l1.5-2h5L16 7"/></svg><span class="flabel" id="flabel">Toque para anexar</span></div>' +
+      '  <button class="genbtn" id="genbtn" onclick="genPhoto()">✦ Gerar foto de catálogo</button>' +
+      '</div>' +
+      '<div class="field"><label>Nome da peça</label><input id="f-nome" value="Brinco Argola Dourada"/></div>' +
+      '<div class="row2">' +
+      '  <div class="field"><label>Preço de venda</label><input id="f-venda" value="49,90" oninput="calcMargem()"/></div>' +
+      '  <div class="field"><label>Preço de custo</label><input id="f-custo" value="18,00" oninput="calcMargem()"/></div>' +
+      '</div>' +
+      '<div class="margem" id="margem"></div>' +
+      '<div class="field" style="margin-top:14px"><label>Cor / modelo</label><input id="f-cor" value="Dourado"/></div>' +
+      '<div class="field"><label>Estoque</label><div class="stock"><span class="steplbl">Unidades</span><div class="stepper"><button onclick="step(-1)">&minus;</button><b id="f-qtd">8</b><button onclick="step(1)">+</button></div></div></div>' +
+      '<div class="field"><label>Descrição</label><textarea id="f-desc" rows="3">Feita em aço inoxidável: não escurece, não dá alergia e mantém o brilho no dia a dia.</textarea></div>' +
+      '<div class="field"><div class="caphead"><label>Legenda pra post</label><button class="minigen" onclick="genCaption()">✦ Gerar legenda</button></div><textarea id="f-cap" rows="5" placeholder="Toque em gerar legenda&hellip;"></textarea></div>' +
+      '<div class="savebar"><button class="ghost" id="btn-rascunho" onclick="salvarRascunho()">Salvar</button><button class="solid" id="btn-publicar" onclick="publicar()">Publicar</button></div>' +
+      '<div class="sectlabel">Estoque agora</div>' +
+      '<div id="stocklist"><div class="statemsg">Carregando&hellip;</div></div>';
+    document.getElementById('who-email').textContent = (JSON.parse(localStorage.getItem('amah_vitrine_user')||'{}').email) || '';
+    calcMargem();
+    loadStocklist();
+  }
+
+  function doLogin() {
+    var email = document.getElementById('login-email').value.trim();
+    var senha = document.getElementById('login-senha').value;
+    var err = document.getElementById('login-err');
+    err.textContent = '';
+    if (!email || !senha) { err.textContent = 'Informe e-mail e senha.'; return; }
+    fetch(API_BASE + '/api/v1/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: senha })
+    }).then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { err.textContent = res.body.error || 'Não foi possível entrar.'; return; }
+        authToken = res.body.token;
+        // guardado só em memória de execução (não em armazenamento persistente do navegador)
+        window.__amahVitrineUser = res.body.user;
+        renderLoja();
+        document.getElementById('who-email') && (document.getElementById('who-email').textContent = res.body.user.email);
+      })
+      .catch(function () { err.textContent = 'Não foi possível conectar ao servidor.'; });
+  }
+  function doLogout() { authToken = null; window.__amahVitrineUser = null; renderLoja(); }
+
+  var currentPhoto = null; // data URL, se anexada
+  function loadPhoto(e){
+    var file=e.target.files[0];if(!file)return;var r=new FileReader();
+    r.onload=function(ev){
+      currentPhoto = ev.target.result;
+      var f=document.getElementById('frame');f.style.backgroundImage='url('+ev.target.result+')';f.classList.add('hasphoto');f.classList.remove('done');
+      document.getElementById('flabel').innerHTML='Sua foto';
+      var b=document.getElementById('genbtn');b.disabled=false;b.innerHTML='✦ Gerar foto de catálogo';
+      toast('Foto anexada 💛');
+    };
+    r.readAsDataURL(file);
+  }
+  function genPhoto(){
+    var f=document.getElementById('frame'),b=document.getElementById('genbtn');
+    if(!f.classList.contains('hasphoto')){toast('Anexe uma foto primeiro');return}
+    b.disabled=true;f.classList.add('shimmer');
+    setTimeout(function(){
+      f.classList.remove('shimmer');document.getElementById('flabel').innerHTML='Sua foto ✦';
+      b.innerHTML='✦ Prévia de catálogo aplicada';b.disabled=false;
+      toast('Esta é uma prévia — a geração real por IA ainda não está conectada ✦');
+    },1050);
+  }
+  function num(v){return parseFloat((v||'').replace(/\./g,'').replace(',','.'))||0}
+  function calcMargem(){
+    var vEl=document.getElementById('f-venda'), cEl=document.getElementById('f-custo');
+    if(!vEl||!cEl)return;
+    var v=num(vEl.value),c=num(cEl.value);var m=document.getElementById('margem');
+    if(v>0&&c>0&&v>c){var pct=Math.round((v-c)/v*100);m.innerHTML='Margem '+pct+'%  &middot;  lucro '+brl(v-c)+' por peça'}else m.textContent=''
+  }
+  var qtd=8;
+  function step(d){qtd=Math.max(0,qtd+d);document.getElementById('f-qtd').textContent=qtd;}
+  function genCaption(){
+    var nome=document.getElementById('f-nome').value,preco=document.getElementById('f-venda').value;
+    document.getElementById('f-cap').value='✦ '+nome+' chegou! ✦\nPra elevar a sua essência todos os dias. R$ '+preco+' — pronta entrega.\nChama no direct pra garantir a sua ♡\n\n#amah #amahbrand #acessórios #vistasuaessencia #modafeminina';
+    toast('Legenda gerada ✦');
+  }
+  function salvarRascunho(){ toast('Rascunho salvo (somente nesta sessão)'); }
+
+  function authFetch(path, options) {
+    options = options || {};
+    options.headers = Object.assign({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken }, options.headers || {});
+    return fetch(API_BASE + path, options).then(function (r) {
+      if (r.status === 401) { authToken = null; renderLoja(); throw new Error('Sessão expirada — entre novamente.'); }
+      return r.json().then(function (body) { if (!r.ok) throw new Error(body.error || 'Erro ao salvar.'); return body; });
+    });
+  }
+
+  function publicar(){
+    var nome = document.getElementById('f-nome').value.trim();
+    var venda = num(document.getElementById('f-venda').value);
+    var custo = num(document.getElementById('f-custo').value);
+    var cor = document.getElementById('f-cor').value.trim();
+    var desc = document.getElementById('f-desc').value.trim();
+    if (!nome) { toast('Dê um nome para a peça'); return; }
+    if (venda <= 0) { toast('Informe o preço de venda'); return; }
+
+    var btn = document.getElementById('btn-publicar');
+    btn.disabled = true; btn.textContent = 'Publicando…';
+
+    var sku = 'V' + Date.now().toString(36).toUpperCase();
+    var product = {
+      sku: sku, name: nome, retailPrice: venda, cost: custo, color: cor,
+      description: desc, active: true, image: currentPhoto || null, createdAt: new Date().toISOString()
+    };
+
+    authFetch('/api/v1/products', { method: 'POST', body: JSON.stringify(product) })
+      .then(function (created) {
+        if (qtd > 0) {
+          return authFetch('/api/v1/inventory-movements', {
+            method: 'POST',
+            body: JSON.stringify({ productId: created.id, type: 'ENTRADA_INICIAL', quantity: qtd, reason: 'Estoque inicial — publicado pela Vitrine', createdAt: new Date().toISOString() })
+          });
+        }
+      })
+      .then(function () {
+        toast('Publicado na vitrine ✦');
+        currentPhoto = null; qtd = 8;
+        renderLoja();
+        loadCatalogo(); // atualiza a vitrine pública também
+      })
+      .catch(function (err) { toast(err.message || 'Não foi possível publicar.'); })
+      .finally(function () { btn.disabled = false; btn.textContent = 'Publicar'; });
+  }
+
+  function loadStocklist() {
+    authFetch('/api/v1/products').then(function (products) {
+      var sl = document.getElementById('stocklist');
+      if (!sl) return;
+      if (products.length === 0) { sl.innerHTML = '<div class="statemsg">Nenhuma peça publicada ainda.</div>'; return; }
+      return Promise.all([Promise.resolve(products), authFetch('/api/v1/inventory-movements')]).then(function (r) {
+        var movements = r[1];
+        var stockMap = {};
+        var TIPOS = { ENTRADA_COMPRA:1, ENTRADA_DEVOLUCAO:1, ENTRADA_AJUSTE:1, ENTRADA_INICIAL:1, SAIDA_VENDA:-1, SAIDA_PERDA:-1, SAIDA_AVARIA:-1, SAIDA_AJUSTE:-1, ESTORNO_VENDA:1, ESTORNO_COMPRA:-1 };
+        movements.forEach(function (m) { stockMap[m.productId] = (stockMap[m.productId]||0) + (TIPOS[m.type]||0) * m.quantity; });
+        sl.innerHTML = '';
+        products.filter(function(p){return p.active !== false}).forEach(function (p) {
+          var q = stockMap[p.id] || 0; var low = q <= 3;
+          var el = document.createElement('div'); el.className = 'stitem';
+          var thumbStyle = p.image ? ' style="background-image:url(\'' + p.image.replace(/'/g,"%27") + '\')"' : '';
+          el.innerHTML = '<div class="stthumb"' + thumbStyle + '>' + (p.image ? '' : '<svg viewBox="0 0 24 24">'+ICONS[iconFor(p)]+'</svg>') + '</div>' +
+            '<div class="stinfo"><h4>' + escapeHtml(p.name) + '</h4><span>' + escapeHtml(p.color||'') + '</span></div>' +
+            '<div class="qty ' + (low?'low':'') + '">' + q + (low?' ⚠':'') + '</div>';
+          sl.appendChild(el);
+        });
+      });
+    }).catch(function (err) {
+      var sl = document.getElementById('stocklist');
+      if (sl) sl.innerHTML = '<div class="statemsg">' + escapeHtml(err.message || 'Erro ao carregar estoque.') + '</div>';
+    });
+  }
+
+  var tt;function toast(m){var t=document.getElementById('toast');t.innerHTML=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(function(){t.classList.remove('show')},1900)}
+
+  loadCatalogo();
+</script>
+</body>
+</html>

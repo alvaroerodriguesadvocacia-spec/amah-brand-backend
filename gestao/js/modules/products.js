@@ -1,0 +1,501 @@
+/* AMÁH Brand — módulo Produtos
+ * Regra central: o campo de estoque NUNCA é gravado diretamente aqui.
+ * Toda alteração de saldo passa por App.core.stockEngine (ver stockEngine.js).
+ */
+(function (global) {
+  'use strict';
+
+  var fmt = App.core.format;
+  var stockEngine = App.core.stockEngine;
+  var currentFilter = '';
+  var cache = { products: [], categories: [], suppliers: [], stockMap: {} };
+
+  function render(container) {
+    container.innerHTML = '';
+    container.appendChild(App.ui.el('div', { class: 'page-header' }, [
+      App.ui.el('div', {}, [
+        App.ui.el('h1', {}, ['Produtos']),
+        App.ui.el('p', {}, ['Cadastro central de produtos. O estoque exibido é sempre calculado a partir do histórico de movimentações.'])
+      ]),
+      App.ui.el('div', { class: 'page-actions' }, [
+        App.ui.el('button', { class: 'btn btn-primary', onclick: function () { openForm(null); } }, ['+ Novo produto'])
+      ])
+    ]));
+
+    var filterRow = App.ui.el('div', { class: 'card', style: 'margin-bottom:14px;' }, [
+      App.ui.el('div', { class: 'card-body', style: 'padding:14px 18px;' }, [
+        App.ui.el('input', {
+          id: 'product-filter-input',
+          placeholder: 'Filtrar por nome, SKU ou código de barras…',
+          style: 'max-width:360px;',
+          oninput: function (e) { currentFilter = e.target.value.toLowerCase(); renderTable(); }
+        })
+      ])
+    ]);
+    container.appendChild(filterRow);
+
+    var body = App.ui.el('div', { class: 'card-body', id: 'products-body' }, [App.ui.el('p', { class: 'text-muted' }, ['Carregando…'])]);
+    container.appendChild(App.ui.el('div', { class: 'card' }, [
+      App.ui.el('div', { class: 'card-header' }, [App.ui.el('h2', {}, ['Todos os produtos'])]),
+      body
+    ]));
+
+    loadAll();
+  }
+
+  function loadAll() {
+    return Promise.all([
+      App.db.getAll('products'),
+      App.db.getAll('categories'),
+      App.db.getAll('suppliers'),
+      stockEngine.calcularSaldoTodos()
+    ]).then(function (results) {
+      cache.products = results[0];
+      cache.categories = results[1];
+      cache.suppliers = results[2];
+      cache.stockMap = results[3];
+      renderTable();
+    });
+  }
+
+  function categoryName(id) {
+    var c = cache.categories.filter(function (c) { return c.id === id; })[0];
+    return c ? c.name : '—';
+  }
+  function supplierName(id) {
+    var s = cache.suppliers.filter(function (s) { return s.id === id; })[0];
+    return s ? s.name : '—';
+  }
+
+  function stockBadge(qty, min) {
+    if (qty <= 0) return App.ui.el('span', { class: 'badge badge-danger' }, ['Sem estoque']);
+    if (min != null && qty <= min) return App.ui.el('span', { class: 'badge badge-warning' }, ['Abaixo do mínimo']);
+    return App.ui.el('span', { class: 'badge badge-success' }, ['OK']);
+  }
+
+  function renderTable() {
+    var body = document.getElementById('products-body');
+    if (!body) return;
+
+    var filtered = cache.products.filter(function (p) {
+      if (!currentFilter) return true;
+      return (p.name || '').toLowerCase().indexOf(currentFilter) !== -1 ||
+        (p.sku || '').toLowerCase().indexOf(currentFilter) !== -1 ||
+        (p.barcode || '').toLowerCase().indexOf(currentFilter) !== -1;
+    }).sort(function (a, b) { return (a.name || '').localeCompare(b.name || '', 'pt-BR'); });
+
+    if (cache.products.length === 0) {
+      body.innerHTML = '';
+      body.appendChild(App.ui.el('div', { class: 'empty-state' }, [
+        App.ui.el('div', { class: 'icon' }, ['💍']),
+        App.ui.el('h3', {}, ['Nenhum produto cadastrado']),
+        App.ui.el('p', {}, ['Cadastre seu primeiro produto para começar a controlar estoque, preços e margens.']),
+        App.ui.el('button', { class: 'btn btn-primary', onclick: function () { openForm(null); } }, ['+ Novo produto'])
+      ]));
+      return;
+    }
+    if (filtered.length === 0) {
+      body.innerHTML = '';
+      body.appendChild(App.ui.el('div', { class: 'table-empty' }, ['Nenhum produto encontrado para "' + currentFilter + '".']));
+      return;
+    }
+
+    var table = App.ui.el('table', { class: 'data-table' });
+    table.appendChild(App.ui.el('thead', {}, [
+      App.ui.el('tr', {}, [
+        App.ui.el('th', {}, ['Produto']),
+        App.ui.el('th', {}, ['Categoria']),
+        App.ui.el('th', {}, ['Fornecedor']),
+        App.ui.el('th', {}, ['Custo']),
+        App.ui.el('th', {}, ['Varejo']),
+        App.ui.el('th', {}, ['Margem']),
+        App.ui.el('th', {}, ['Estoque']),
+        App.ui.el('th', {}, ['Status']),
+        App.ui.el('th', {}, [''])
+      ])
+    ]));
+    var tbody = App.ui.el('tbody');
+    filtered.forEach(function (p) {
+      var totalCost = (Number(p.cost) || 0) + (Number(p.additionalCosts) || 0);
+      var margin = p.retailPrice > 0 ? ((p.retailPrice - totalCost) / p.retailPrice) * 100 : 0;
+      var qty = cache.stockMap[p.id] || 0;
+      tbody.appendChild(App.ui.el('tr', {}, [
+        App.ui.el('td', {}, [
+          App.ui.el('strong', {}, [p.name]),
+          App.ui.el('div', { class: 'text-faint mono' }, [p.sku + (p.barcode ? ' · ' + p.barcode : '')])
+        ]),
+        App.ui.el('td', {}, [categoryName(p.categoryId)]),
+        App.ui.el('td', {}, [supplierName(p.supplierId)]),
+        App.ui.el('td', { class: 'mono' }, [fmt.money(totalCost)]),
+        App.ui.el('td', { class: 'mono' }, [fmt.money(p.retailPrice)]),
+        App.ui.el('td', { class: 'mono' }, [fmt.percent(margin)]),
+        App.ui.el('td', {}, [
+          App.ui.el('div', { class: 'flex items-center gap-8' }, [
+            App.ui.el('span', { class: 'mono' }, [String(qty)]),
+            stockBadge(qty, p.minStock)
+          ])
+        ]),
+        App.ui.el('td', {}, [App.ui.el('span', { class: 'badge ' + (p.active ? 'badge-success' : 'badge-neutral') }, [p.active ? 'Ativo' : 'Inativo'])]),
+        App.ui.el('td', { class: 'row-actions' }, [
+          App.ui.el('button', { class: 'btn btn-secondary btn-sm', onclick: function () { openDetail(p); } }, ['Ver']),
+          App.ui.el('button', { class: 'btn btn-ghost btn-sm', onclick: function () { openForm(p); } }, ['Editar'])
+        ])
+      ]));
+    });
+    table.appendChild(tbody);
+    body.innerHTML = '';
+    body.appendChild(App.ui.el('div', { class: 'table-wrap' }, [table]));
+  }
+
+  // ---------- Detalhe do produto (consulta + histórico + ajuste de estoque) ----------
+
+  function openDetail(product) {
+    var qty = cache.stockMap[product.id] || 0;
+    var totalCost = (Number(product.cost) || 0) + (Number(product.additionalCosts) || 0);
+    var margin = product.retailPrice > 0 ? ((product.retailPrice - totalCost) / product.retailPrice) * 100 : 0;
+    var location = [product.location && product.location.shelf, product.location && product.location.drawer, product.location && product.location.box]
+      .filter(Boolean).join(' → ') || '—';
+
+    var summary = App.ui.el('div', { class: 'form-grid cols-3', style: 'margin-bottom:18px;' }, [
+      infoBlock('Estoque atual', String(qty)),
+      infoBlock('Estoque mínimo / ideal', (product.minStock != null ? product.minStock : '—') + ' / ' + (product.idealStock != null ? product.idealStock : '—')),
+      infoBlock('Localização física', location),
+      infoBlock('Custo total', fmt.money(totalCost)),
+      infoBlock('Preço varejo', fmt.money(product.retailPrice)),
+      infoBlock('Margem', fmt.percent(margin)),
+      infoBlock('Preço atacado', fmt.money(product.wholesalePrice)),
+      infoBlock('Fornecedor', supplierName(product.supplierId)),
+      infoBlock('Categoria', categoryName(product.categoryId)),
+      infoBlock('Total vendido (histórico)', String(product.totalSold || 0)),
+      infoBlock('Última compra', fmt.dateBR(product.lastPurchaseAt)),
+      infoBlock('Última venda', fmt.dateBR(product.lastSaleAt))
+    ]);
+
+    var historyContainer = App.ui.el('div', { id: 'stock-history' }, [App.ui.el('p', { class: 'text-muted' }, ['Carregando histórico…'])]);
+
+    var wrapper = App.ui.el('div', {}, [
+      summary,
+      App.ui.el('div', { class: 'flex items-center gap-8', style: 'justify-content:space-between; margin-bottom:10px; flex-wrap:wrap;' }, [
+        App.ui.el('h4', { style: 'margin:0;' }, ['Histórico de movimentações']),
+        App.ui.el('div', { class: 'flex gap-8' }, [
+          App.ui.el('button', { class: 'btn btn-secondary btn-sm', onclick: function () { openPrintLabels(product); } }, ['🏷️ Imprimir etiqueta']),
+          App.ui.el('button', {
+            class: 'btn btn-secondary btn-sm',
+            onclick: function () {
+              openAdjustStock(product, function () {
+                // Após ajustar, fecha o detalhe e reabre com os dados atualizados
+                // (evita mostrar saldo/histórico desatualizados no mesmo modal).
+                detailModalRef.close();
+                loadAll().then(function () {
+                  var updated = cache.products.filter(function (p) { return p.id === product.id; })[0];
+                  openDetail(updated || product);
+                });
+              });
+            }
+          }, ['Ajustar estoque'])
+        ])
+      ]),
+      historyContainer
+    ]);
+
+    var detailModalRef = App.ui.openModal({
+      title: product.name,
+      size: 'wide',
+      bodyNode: wrapper,
+      footerButtons: [{ label: 'Fechar', className: 'btn-secondary' }]
+    });
+
+    stockEngine.historico(product.id).then(function (movements) {
+      historyContainer.innerHTML = '';
+      if (movements.length === 0) {
+        historyContainer.appendChild(App.ui.el('p', { class: 'text-muted' }, ['Nenhuma movimentação registrada ainda.']));
+        return;
+      }
+      var table = App.ui.el('table', { class: 'data-table' });
+      table.appendChild(App.ui.el('thead', {}, [App.ui.el('tr', {}, [
+        App.ui.el('th', {}, ['Data']), App.ui.el('th', {}, ['Tipo']), App.ui.el('th', {}, ['Qtd']), App.ui.el('th', {}, ['Motivo/Documento'])
+      ])]));
+      var tbody = App.ui.el('tbody');
+      movements.forEach(function (m) {
+        var isEntrada = stockEngine.TIPOS_ENTRADA.indexOf(m.type) !== -1;
+        tbody.appendChild(App.ui.el('tr', {}, [
+          App.ui.el('td', {}, [fmt.dateTimeBR(m.createdAt)]),
+          App.ui.el('td', {}, [App.ui.el('span', { class: 'badge ' + (isEntrada ? 'badge-success' : 'badge-danger') }, [movementLabel(m.type)])]),
+          App.ui.el('td', { class: 'mono' }, [(isEntrada ? '+' : '−') + m.quantity]),
+          App.ui.el('td', { class: 'text-muted' }, [m.reason || m.relatedDocument || '—'])
+        ]));
+      });
+      table.appendChild(tbody);
+      historyContainer.appendChild(App.ui.el('div', { class: 'table-wrap' }, [table]));
+    });
+  }
+
+  function movementLabel(type) {
+    var labels = {
+      ENTRADA_COMPRA: 'Entrada (compra)', ENTRADA_DEVOLUCAO: 'Entrada (devolução)',
+      ENTRADA_AJUSTE: 'Ajuste (entrada)', ENTRADA_INICIAL: 'Estoque inicial',
+      SAIDA_VENDA: 'Saída (venda)', SAIDA_PERDA: 'Saída (perda)', SAIDA_AVARIA: 'Saída (avaria)',
+      SAIDA_AJUSTE: 'Ajuste (saída)', ESTORNO_VENDA: 'Estorno de venda', ESTORNO_COMPRA: 'Estorno de compra'
+    };
+    return labels[type] || type;
+  }
+
+  function infoBlock(label, value) {
+    return App.ui.el('div', {}, [
+      App.ui.el('div', { class: 'text-faint', style: 'font-size:11.5px; text-transform:uppercase; font-weight:700; margin-bottom:3px;' }, [label]),
+      App.ui.el('div', { style: 'font-weight:600;' }, [value])
+    ]);
+  }
+
+  function openPrintLabels(product) {
+    var code = product.barcode || product.sku;
+    var qtyInput = App.ui.el('input', { id: 'label-qty', type: 'number', min: '1', value: '10' });
+    var preview = App.ui.el('div', { style: 'margin-top:10px; padding:10px; border:1px dashed var(--color-border); border-radius:8px; text-align:center;' });
+    try { preview.innerHTML = App.core.labels.svgBarcode(code); } catch (e) {}
+    var body = App.ui.el('div', {}, [
+      App.ui.el('div', { class: 'form-grid' }, [
+        App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, ['Quantidade de etiquetas']), qtyInput]),
+        App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, ['Código utilizado']), App.ui.el('input', { value: code, disabled: 'disabled' })])
+      ]),
+      App.ui.el('div', { class: 'hint' }, ['Prévia (Code128) — a impressão abrirá em uma nova janela.']),
+      preview
+    ]);
+    App.ui.openModal({
+      title: 'Imprimir etiqueta — ' + product.name,
+      bodyNode: body,
+      footerButtons: [
+        { label: 'Cancelar', className: 'btn-secondary' },
+        {
+          label: 'Gerar e imprimir', className: 'btn-primary', onClick: function (close) {
+            var qty = Math.max(1, Number(qtyInput.value) || 1);
+            App.core.labels.printLabels([{ product: product, qty: qty }]);
+            close();
+          }
+        }
+      ]
+    });
+  }
+
+  function openAdjustStock(product, onSuccess) {
+    var errorBox = App.ui.el('div', { class: 'modal-alert hidden' });
+    var direction = App.ui.el('select', { id: 'adj-direction' }, [
+      App.ui.el('option', { value: 'ENTRADA_AJUSTE' }, ['Entrada (ajuste positivo)']),
+      App.ui.el('option', { value: 'SAIDA_AJUSTE' }, ['Saída (ajuste negativo)']),
+      App.ui.el('option', { value: 'SAIDA_PERDA' }, ['Saída (perda)']),
+      App.ui.el('option', { value: 'SAIDA_AVARIA' }, ['Saída (avaria)'])
+    ]);
+    var form = App.ui.el('div', { class: 'form-grid' }, [
+      App.ui.el('div', { class: 'form-field span-2' }, [App.ui.el('label', {}, ['Tipo de movimentação']), direction]),
+      App.ui.el('div', { class: 'form-field' }, [
+        App.ui.el('label', {}, ['Quantidade *']),
+        App.ui.el('input', { id: 'adj-qty', type: 'number', min: '1', step: '1' })
+      ]),
+      App.ui.el('div', { class: 'form-field span-2' }, [
+        App.ui.el('label', {}, ['Motivo *']),
+        App.ui.el('input', { id: 'adj-reason', placeholder: 'Ex.: Contagem física, quebra, correção de cadastro' })
+      ])
+    ]);
+    var wrapper = App.ui.el('div', {}, [errorBox, form]);
+
+    App.ui.openModal({
+      title: 'Ajustar estoque — ' + product.name,
+      bodyNode: wrapper,
+      footerButtons: [
+        { label: 'Cancelar', className: 'btn-secondary' },
+        {
+          label: 'Confirmar ajuste', className: 'btn-primary',
+          onClick: function (close) {
+            var qty = Number(document.getElementById('adj-qty').value);
+            var reason = document.getElementById('adj-reason').value.trim();
+            var type = direction.value;
+            try {
+              App.core.validation.positiveNumber(qty, 'Quantidade');
+              App.core.validation.required(reason, 'Motivo do ajuste');
+            } catch (err) {
+              errorBox.textContent = err.message; errorBox.classList.remove('hidden'); return;
+            }
+            stockEngine.registrarMovimentacao({ productId: product.id, type: type, quantity: qty, reason: reason }).then(function () {
+              App.ui.toast('Estoque ajustado.', 'success');
+              close();
+              if (onSuccess) onSuccess();
+              else loadAll();
+            }).catch(function (err) {
+              errorBox.textContent = err.message; errorBox.classList.remove('hidden');
+            });
+          }
+        }
+      ]
+    });
+  }
+
+  // ---------- Formulário de cadastro/edição ----------
+
+  function selectField(id, label, options, selectedValue, required) {
+    var select = App.ui.el('select', { id: id });
+    if (!required) select.appendChild(App.ui.el('option', { value: '' }, ['—']));
+    options.forEach(function (opt) {
+      var attrs = { value: opt.id };
+      if (opt.id === selectedValue) attrs.selected = 'selected';
+      select.appendChild(App.ui.el('option', attrs, [opt.name]));
+    });
+    return App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, [label]), select]);
+  }
+
+  function inputField(id, label, value, opts) {
+    opts = opts || {};
+    var attrs = Object.assign({ id: id, value: value != null ? value : '' }, opts.attrs || {});
+    return App.ui.el('div', { class: 'form-field' + (opts.span2 ? ' span-2' : '') }, [
+      App.ui.el('label', {}, [label]),
+      App.ui.el('input', attrs)
+    ]);
+  }
+
+  function openForm(existing, onCreated, prefill) {
+    var isEdit = !!existing;
+    prefill = prefill || {};
+
+    var wrapper = App.ui.el('div');
+    var errorBox = App.ui.el('div', { class: 'modal-alert hidden' });
+    wrapper.appendChild(errorBox);
+
+    Promise.all([App.db.getAll('categories'), App.db.getAll('suppliers')]).then(function (results) {
+      var categories = results[0].filter(function (c) { return c.active; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
+      var suppliers = results[1].filter(function (s) { return s.active; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
+
+      var form = App.ui.el('div', { class: 'form-grid' }, [
+        App.ui.el('div', { class: 'form-section-title' }, ['Identificação']),
+        inputField('p-name', 'Nome comercial *', existing && existing.name, { span2: true, attrs: { placeholder: 'Ex.: Brinco Argola Dourada' } }),
+        inputField('p-sku', 'Código / SKU *', (existing && existing.sku) || prefill.sku, { attrs: { placeholder: 'Ex.: BR001' } }),
+        inputField('p-barcode', 'Código de barras', (existing && existing.barcode) || prefill.barcode, { attrs: { placeholder: 'Opcional — leitura futura por scanner' } }),
+        selectField('p-category', 'Categoria', categories, existing && existing.categoryId),
+        selectField('p-supplier', 'Fornecedor principal', suppliers, existing && existing.supplierId),
+        inputField('p-subcategory', 'Subcategoria', existing && existing.subcategory),
+        inputField('p-collection', 'Coleção', existing && existing.collection),
+        inputField('p-model', 'Modelo', existing && existing.model),
+        inputField('p-color', 'Cor', existing && existing.color),
+        inputField('p-material', 'Material', existing && existing.material),
+
+        App.ui.el('div', { class: 'form-section-title' }, ['Custos e preços']),
+        inputField('p-cost', 'Custo de aquisição (R$) *', existing ? existing.cost : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
+        inputField('p-addcost', 'Custos adicionais (R$)', existing ? existing.additionalCosts : '0', { attrs: { type: 'number', step: '0.01', min: '0' } }),
+        inputField('p-retail', 'Preço de varejo (R$) *', existing ? existing.retailPrice : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
+        inputField('p-wholesale', 'Preço de atacado (R$)', existing ? existing.wholesalePrice : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
+        inputField('p-promo', 'Preço promocional (R$)', existing ? existing.promoPrice : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
+
+        App.ui.el('div', { class: 'form-section-title' }, ['Estoque']),
+        isEdit
+          ? App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, ['Estoque atual']), App.ui.el('input', { value: String((cache.stockMap[existing.id] || 0)), disabled: 'disabled' }), App.ui.el('div', { class: 'hint' }, ['Use "Ajustar estoque" na tela de detalhe para alterar.'])])
+          : inputField('p-initial-stock', 'Estoque inicial', '0', { attrs: { type: 'number', step: '1', min: '0' } }),
+        inputField('p-min-stock', 'Estoque mínimo', existing ? existing.minStock : '', { attrs: { type: 'number', step: '1', min: '0' } }),
+        inputField('p-ideal-stock', 'Estoque ideal', existing ? existing.idealStock : '', { attrs: { type: 'number', step: '1', min: '0' } }),
+
+        App.ui.el('div', { class: 'form-section-title' }, ['Localização física']),
+        inputField('p-loc-shelf', 'Estante', existing && existing.location && existing.location.shelf),
+        inputField('p-loc-drawer', 'Gaveta', existing && existing.location && existing.location.drawer),
+        inputField('p-loc-box', 'Caixa', existing && existing.location && existing.location.box),
+
+        App.ui.el('div', { class: 'form-section-title' }, ['Outros']),
+        App.ui.el('div', { class: 'form-field span-2' }, [
+          App.ui.el('label', {}, ['Observações']),
+          App.ui.el('textarea', { id: 'p-notes' }, [(existing && existing.notes) || ''])
+        ]),
+        App.ui.el('div', { class: 'form-field' }, [
+          App.ui.el('div', { class: 'checkbox-row' }, [
+            App.ui.el('input', Object.assign({ type: 'checkbox', id: 'p-active' }, (!existing || existing.active) ? { checked: 'checked' } : {})),
+            App.ui.el('label', { for: 'p-active' }, ['Produto ativo'])
+          ])
+        ])
+      ]);
+      wrapper.appendChild(form);
+    });
+
+    App.ui.openModal({
+      title: isEdit ? 'Editar produto' : 'Novo produto',
+      size: 'wide',
+      bodyNode: wrapper,
+      footerButtons: [
+        { label: 'Cancelar', className: 'btn-secondary' },
+        { label: isEdit ? 'Salvar alterações' : 'Criar produto', className: 'btn-primary', onClick: function (close) { save(close); } }
+      ]
+    });
+
+    function readVal(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+    function readNum(id) { var v = readVal(id); return v === '' ? null : Number(v); }
+
+    function save(close) {
+      errorBox.classList.add('hidden');
+      var name = readVal('p-name');
+      var sku = readVal('p-sku').toUpperCase();
+      var cost = readNum('p-cost');
+      var retail = readNum('p-retail');
+
+      try {
+        App.core.validation.required(name, 'Nome do produto');
+        App.core.validation.required(sku, 'Código/SKU');
+        if (cost == null) throw new Error('Custo de aquisição é obrigatório.');
+        App.core.validation.positiveNumber(cost, 'Custo de aquisição', true);
+        if (retail == null) throw new Error('Preço de varejo é obrigatório.');
+        App.core.validation.positiveNumber(retail, 'Preço de varejo', true);
+      } catch (err) {
+        errorBox.textContent = err.message; errorBox.classList.remove('hidden'); return;
+      }
+
+      App.core.validation.skuUnico(sku, existing ? existing.id : null).then(function () {
+        var record = existing ? Object.assign({}, existing) : {
+          id: App.core.uuid(), createdAt: fmt.nowIso(), totalSold: 0, lastPurchaseAt: null, lastSaleAt: null
+        };
+        var oldValue = existing ? Object.assign({}, existing) : null;
+
+        record.name = name;
+        record.sku = sku;
+        record.barcode = readVal('p-barcode') || null;
+        record.description = record.description || '';
+        record.categoryId = readVal('p-category') || null;
+        record.supplierId = readVal('p-supplier') || null;
+        record.subcategory = readVal('p-subcategory');
+        record.collection = readVal('p-collection');
+        record.model = readVal('p-model');
+        record.color = readVal('p-color');
+        record.material = readVal('p-material');
+        record.cost = cost;
+        record.additionalCosts = readNum('p-addcost') || 0;
+        record.wholesalePrice = readNum('p-wholesale') || 0;
+        record.retailPrice = retail;
+        record.promoPrice = readNum('p-promo');
+        record.minStock = readNum('p-min-stock');
+        record.idealStock = readNum('p-ideal-stock');
+        record.location = { shelf: readVal('p-loc-shelf'), drawer: readVal('p-loc-drawer'), box: readVal('p-loc-box') };
+        record.notes = readVal('p-notes');
+        record.active = document.getElementById('p-active').checked;
+        record.updatedAt = fmt.nowIso();
+
+        var initialStock = !isEdit ? (readNum('p-initial-stock') || 0) : 0;
+
+        return App.db.runAtomic(['products', 'audit_logs'], 'readwrite', function (t) {
+          t.objectStore('products').put(record);
+          App.core.audit.log(t, {
+            operation: isEdit ? 'UPDATE' : 'CREATE', entity: 'products', entityId: record.id,
+            oldValue: oldValue, newValue: record
+          });
+        }).then(function () {
+          if (!isEdit && initialStock > 0) {
+            return stockEngine.registrarMovimentacao({
+              productId: record.id, type: 'ENTRADA_INICIAL', quantity: initialStock, reason: 'Estoque inicial no cadastro do produto'
+            });
+          }
+        }).then(function () {
+          App.ui.toast(isEdit ? 'Produto atualizado.' : 'Produto criado.', 'success');
+          close();
+          if (onCreated) onCreated(record);
+          if (document.getElementById('products-body')) loadAll();
+        });
+      }).catch(function (err) {
+        errorBox.textContent = err.message; errorBox.classList.remove('hidden');
+      });
+    }
+  }
+
+  global.App = global.App || {};
+  global.App.modules = global.App.modules || {};
+  global.App.modules.products = { render: render, reloadCache: loadAll, openForm: openForm, openDetail: openDetail };
+})(window);
