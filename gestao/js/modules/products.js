@@ -18,6 +18,7 @@
         App.ui.el('p', {}, ['Cadastro central de produtos. O estoque exibido é sempre calculado a partir do histórico de movimentações.'])
       ]),
       App.ui.el('div', { class: 'page-actions' }, [
+        App.ui.el('button', { class: 'btn btn-secondary', onclick: function () { openBatchGenerate(); } }, ['✨ Gerar descrições Amáhr']),
         App.ui.el('button', { class: 'btn btn-primary', onclick: function () { openForm(null); } }, ['+ Novo produto'])
       ])
     ]));
@@ -431,6 +432,273 @@
     ]);
   }
 
+  // Campo "Por que você vai Amáhr": textarea + botões de geração + tags de
+  // personalidade (opcionais) + inspiração cristã (opcional). Ver
+  // js/core/whyAmahrEngine.js para a lógica de geração/aprendizado.
+  // categories = lista completa (não só ativas), pra resolver o nome da
+  // categoria mesmo quando o produto está com uma categoria já inativa.
+  function whyAmahrField(existing, categories) {
+    var engine = App.core.whyAmahrEngine;
+    var initialText = (existing && existing.whyAmahr) || '';
+    var baseline = (existing && (existing.whyAmahrSource === 'auto' || existing.whyAmahrSource === 'auto-edited') &&
+      existing.whyAmahrSentences && existing.whyAmahrSentences.length)
+      ? { sentences: existing.whyAmahrSentences, fragmentIds: existing.whyAmahrFragments || [] }
+      : null;
+    var existingStyleTags = (existing && existing.styleTags) || [];
+    var generatedAt = (existing && existing.whyAmahrGeneratedAt) || null;
+
+    function currentBaselineText() { return baseline ? baseline.sentences.join(' ') : null; }
+
+    var statusBadge = App.ui.el('span', { class: 'badge badge-neutral' }, ['—']);
+    var textarea = App.ui.el('textarea', {
+      id: 'p-whyamahr', rows: '4',
+      placeholder: 'Clique em "Gerar automaticamente" ou escreva livremente…',
+      oninput: refreshStatus
+    });
+    textarea.value = initialText;
+
+    function refreshStatus() {
+      var val = textarea.value.trim();
+      var baseText = currentBaselineText();
+      var cls = 'badge-neutral', label = 'Ainda não gerado';
+      if (val && baseline && val === baseText) { cls = 'badge-success'; label = 'Gerado automaticamente'; }
+      else if (val) { cls = 'badge-warning'; label = 'Editado manualmente'; }
+      statusBadge.className = 'badge ' + cls;
+      statusBadge.textContent = label;
+    }
+    refreshStatus();
+
+    function tagId(label) { return 'p-styletag-' + label.replace(/[^a-zA-Z0-9]/g, ''); }
+    var tagsWrap = App.ui.el('div', { style: 'display:flex;flex-wrap:wrap;gap:2px;margin-top:4px;' },
+      engine.PROFILE_LABELS.map(function (label) {
+        var input = App.ui.el('input', Object.assign(
+          { type: 'checkbox', id: tagId(label) },
+          existingStyleTags.indexOf(label) !== -1 ? { checked: 'checked' } : {}
+        ));
+        return App.ui.el('label', { class: 'checkbox-row', style: 'margin:0 12px 6px 0;' }, [input, App.ui.el('span', {}, [label])]);
+      }));
+    function readStyleTags() {
+      return engine.PROFILE_LABELS.filter(function (label) {
+        var el = document.getElementById(tagId(label));
+        return el && el.checked;
+      });
+    }
+
+    var faithInput = App.ui.el('input', {
+      id: 'p-faith', value: (existing && existing.faithInspiration) || '',
+      placeholder: 'Ex.: inspirada na ideia de graça, coleção "Fé em detalhes"…'
+    });
+
+    function readDomVal(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+    function collectDraft() {
+      var catSelect = document.getElementById('p-category');
+      var cat = catSelect ? categories.filter(function (c) { return c.id === catSelect.value; })[0] : null;
+      return {
+        name: readDomVal('p-name'),
+        categoryName: cat ? cat.name : '',
+        subcategory: readDomVal('p-subcategory'),
+        collection: readDomVal('p-collection'),
+        model: readDomVal('p-model'),
+        color: readDomVal('p-color'),
+        material: readDomVal('p-material'),
+        description: readDomVal('p-notes'), // notas internas podem citar detalhes reais úteis pra classificação
+        styleTags: readStyleTags(),
+        faithInspiration: readDomVal('p-faith')
+      };
+    }
+
+    var genBtn = App.ui.el('button', { type: 'button', class: 'btn btn-secondary btn-sm' }, ['✨ Gerar automaticamente']);
+    var regenBtn = App.ui.el('button', { type: 'button', class: 'btn btn-ghost btn-sm' }, ['🔄 Gerar outra versão']);
+    var editBtn = App.ui.el('button', {
+      type: 'button', class: 'btn btn-ghost btn-sm',
+      onclick: function () { textarea.focus(); textarea.select(); App.ui.toast('Edite livremente — o que você escrever é salvo do seu jeito.', 'info'); }
+    }, ['✏️ Editar manualmente']);
+
+    function doGenerate(isRegen) {
+      var draft = collectDraft();
+      if (!draft.name) { App.ui.toast('Preencha ao menos o nome do produto antes de gerar.', 'warning'); return; }
+      genBtn.disabled = true; regenBtn.disabled = true;
+      var exclude = (isRegen && baseline) ? baseline.fragmentIds : [];
+      engine.gerar(draft, { excludeFragmentIds: exclude }).then(function (res) {
+        baseline = { sentences: res.sentences, fragmentIds: res.fragmentIds };
+        generatedAt = fmt.nowIso();
+        textarea.value = res.text;
+        refreshStatus();
+      }).catch(function () {
+        App.ui.toast('Não foi possível gerar o texto agora.', 'error');
+      }).then(function () {
+        genBtn.disabled = false; regenBtn.disabled = false;
+      });
+    }
+    genBtn.addEventListener('click', function () { doGenerate(false); });
+    regenBtn.addEventListener('click', function () { doGenerate(true); });
+
+    var node = App.ui.el('div', { class: 'form-field span-2' }, [
+      App.ui.el('div', { class: 'flex items-center gap-8', style: 'justify-content:space-between;flex-wrap:wrap;' }, [
+        App.ui.el('label', { style: 'margin:0;' }, ['Por que você vai Amáhr']),
+        statusBadge
+      ]),
+      textarea,
+      App.ui.el('div', { class: 'flex gap-8', style: 'margin-top:6px;flex-wrap:wrap;' }, [genBtn, regenBtn, editBtn]),
+      App.ui.el('div', { class: 'hint', style: 'margin-top:10px;' }, ['Personalidade da peça (opcional — ajuda a escolher o tom certo; deixe em branco para classificação automática)']),
+      tagsWrap,
+      App.ui.el('div', { class: 'hint', style: 'margin-top:10px;' }, ['Inspiração cristã / coleção especial (opcional — só entra no texto quando este campo está preenchido)']),
+      faithInput
+    ]);
+
+    return {
+      node: node,
+      getValue: function () {
+        var text = textarea.value.trim();
+        var baseText = currentBaselineText();
+        var source, sentences, fragmentIds;
+        if (!text) { source = null; sentences = null; fragmentIds = null; }
+        else if (baseline && text === baseText) { source = 'auto'; sentences = baseline.sentences; fragmentIds = baseline.fragmentIds; }
+        else if (baseline) { source = 'auto-edited'; sentences = baseline.sentences; fragmentIds = baseline.fragmentIds; }
+        else { source = 'manual'; sentences = null; fragmentIds = null; }
+        return {
+          text: text, source: source, sentences: sentences, fragmentIds: fragmentIds,
+          generatedAt: (source === 'auto' || source === 'auto-edited') ? generatedAt : null,
+          styleTags: readStyleTags(),
+          faithInspiration: readDomVal('p-faith'),
+          learnBaseline: baseline
+        };
+      }
+    };
+  }
+
+  // Ação em lote: gera um rascunho de "Por que você vai Amáhr" para todo
+  // produto ativo que ainda não tem o campo preenchido. Revisão obrigatória
+  // antes de salvar (Aprovar / editar o texto / Gerar novamente).
+  function openBatchGenerate() {
+    Promise.all([App.db.getAll('products'), App.db.getAll('categories')]).then(function (results) {
+      var products = results[0], categories = results[1];
+      var pending = products.filter(function (p) { return p.active !== false && (!p.whyAmahr || !String(p.whyAmahr).trim()); });
+
+      if (!pending.length) {
+        App.ui.toast('Todos os produtos ativos já têm a descrição Amáhr.', 'success');
+        return;
+      }
+
+      var engine = App.core.whyAmahrEngine;
+      function catName(id) { var c = categories.filter(function (c) { return c.id === id; })[0]; return c ? c.name : ''; }
+      function draftFor(p, excludeIds) {
+        return engine.gerar({
+          name: p.name, categoryName: catName(p.categoryId), subcategory: p.subcategory,
+          collection: p.collection, model: p.model, color: p.color, material: p.material,
+          description: p.notes || '', styleTags: p.styleTags || [], faithInspiration: p.faithInspiration
+        }, { excludeFragmentIds: excludeIds || [] });
+      }
+
+      var items = {}; // productId -> { product, draft, textarea, approved, approveBtn, row }
+      var pendingCount = pending.length;
+      var counterEl = App.ui.el('span', {}, [String(pendingCount) + ' pendente(s)']);
+      var listWrap = App.ui.el('div', { id: 'batch-list' });
+      var body = App.ui.el('div', {}, [
+        App.ui.el('div', { class: 'hint', style: 'margin-bottom:10px;' }, [
+          pending.length + ' produto(s) ativo(s) ainda sem "Por que você vai Amáhr". Revise cada texto (edite se quiser) e aprove — ',
+          counterEl
+        ]),
+        listWrap
+      ]);
+
+      function updateCounter() {
+        counterEl.textContent = String(pendingCount) + ' pendente(s)';
+        if (pendingCount === 0) {
+          App.ui.toast('Todos os textos pendentes foram aprovados.', 'success');
+          loadAll();
+        }
+      }
+
+      function saveApproved(p, text, draft, row) {
+        var record = Object.assign({}, p, {
+          whyAmahr: text,
+          whyAmahrSource: (text === draft.text) ? 'auto' : 'auto-edited',
+          whyAmahrSentences: draft.sentences,
+          whyAmahrFragments: draft.fragmentIds,
+          whyAmahrGeneratedAt: fmt.nowIso(),
+          updatedAt: fmt.nowIso()
+        });
+        return App.db.runAtomic(['products', 'audit_logs'], 'readwrite', function (t) {
+          t.objectStore('products').put(record);
+          App.core.audit.log(t, { operation: 'UPDATE', entity: 'products', entityId: record.id, oldValue: p, newValue: record });
+        }).then(function () {
+          if (text !== draft.text) engine.registrarEdicao(draft, text);
+          row.style.opacity = '0.45';
+          row.querySelectorAll('button, textarea').forEach(function (el) { el.disabled = true; });
+          pendingCount -= 1;
+          updateCounter();
+        }).catch(function (err) {
+          App.ui.toast('Erro ao salvar "' + p.name + '": ' + err.message, 'error');
+        });
+      }
+
+      pending.forEach(function (p) {
+        var row = App.ui.el('div', { class: 'card', style: 'margin-bottom:12px;' });
+        var headerRow = App.ui.el('div', { class: 'flex items-center gap-8', style: 'padding:12px 16px 0;justify-content:space-between;flex-wrap:wrap;' }, [
+          App.ui.el('strong', {}, [p.name]),
+          App.ui.el('span', { class: 'text-faint' }, [p.sku || ''])
+        ]);
+        var contentWrap = App.ui.el('div', { class: 'card-body', style: 'padding:10px 16px 16px;' }, [
+          App.ui.el('p', { class: 'text-muted' }, ['Gerando…'])
+        ]);
+        row.appendChild(headerRow);
+        row.appendChild(contentWrap);
+        listWrap.appendChild(row);
+        items[p.id] = { row: row };
+
+        draftFor(p).then(function (res) {
+          items[p.id].draft = res;
+          var textarea = App.ui.el('textarea', { rows: '3', style: 'width:100%;' });
+          textarea.value = res.text;
+
+          var approveBtn = App.ui.el('button', {
+            type: 'button', class: 'btn btn-primary btn-sm',
+            onclick: function () { saveApproved(p, textarea.value.trim(), items[p.id].draft, row); }
+          }, ['Aprovar']);
+          var regenBtn = App.ui.el('button', {
+            type: 'button', class: 'btn btn-ghost btn-sm',
+            onclick: function () {
+              regenBtn.disabled = true;
+              draftFor(p, items[p.id].draft.fragmentIds).then(function (res2) {
+                items[p.id].draft = res2;
+                textarea.value = res2.text;
+              }).then(function () { regenBtn.disabled = false; });
+            }
+          }, ['Gerar novamente']);
+
+          contentWrap.innerHTML = '';
+          contentWrap.appendChild(textarea);
+          contentWrap.appendChild(App.ui.el('div', { class: 'flex gap-8', style: 'margin-top:8px;' }, [approveBtn, regenBtn]));
+        });
+      });
+
+      App.ui.openModal({
+        title: 'Gerar descrições Amáhr',
+        size: 'wide',
+        bodyNode: body,
+        closeOnBackdrop: false,
+        footerButtons: [
+          {
+            label: 'Aprovar todos', className: 'btn-primary',
+            onClick: function (close) {
+              var promises = pending
+                .filter(function (p) { return items[p.id] && items[p.id].draft && items[p.id].row.style.opacity !== '0.45'; })
+                .map(function (p) {
+                  var textareaEl = items[p.id].row.querySelector('textarea');
+                  var text = textareaEl ? textareaEl.value.trim() : items[p.id].draft.text;
+                  return saveApproved(p, text, items[p.id].draft, items[p.id].row);
+                });
+              Promise.all(promises).then(function () { close(); loadAll(); });
+            }
+          },
+          { label: 'Fechar', className: 'btn-secondary', onClick: function (close) { close(); loadAll(); } }
+        ]
+      });
+    });
+  }
+
   function openForm(existing, onCreated, prefill) {
     var isEdit = !!existing;
     prefill = prefill || {};
@@ -439,11 +707,13 @@
     var errorBox = App.ui.el('div', { class: 'modal-alert hidden' });
     wrapper.appendChild(errorBox);
     var photo = null; // preenchido depois que o form monta (ver photoField)
+    var whyAmahr = null; // preenchido depois que o form monta (ver whyAmahrField)
 
     Promise.all([App.db.getAll('categories'), App.db.getAll('suppliers')]).then(function (results) {
       var categories = results[0].filter(function (c) { return c.active; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
       var suppliers = results[1].filter(function (s) { return s.active; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
       photo = photoField(existing && existing.image);
+      whyAmahr = whyAmahrField(existing, results[0]);
 
       var form = App.ui.el('div', { class: 'form-grid' }, [
         App.ui.el('div', { class: 'form-section-title' }, ['Identificação']),
@@ -488,7 +758,10 @@
             App.ui.el('input', Object.assign({ type: 'checkbox', id: 'p-active' }, (!existing || existing.active) ? { checked: 'checked' } : {})),
             App.ui.el('label', { for: 'p-active' }, ['Produto ativo'])
           ])
-        ])
+        ]),
+
+        App.ui.el('div', { class: 'form-section-title' }, ['Comunicação da vitrine']),
+        whyAmahr.node
       ]);
       wrapper.appendChild(form);
     });
@@ -554,6 +827,15 @@
         record.active = document.getElementById('p-active').checked;
         record.updatedAt = fmt.nowIso();
 
+        var whyResult = whyAmahr.getValue();
+        record.whyAmahr = whyResult.text;
+        record.whyAmahrSource = whyResult.source;
+        record.whyAmahrSentences = whyResult.sentences;
+        record.whyAmahrFragments = whyResult.fragmentIds;
+        record.whyAmahrGeneratedAt = whyResult.generatedAt;
+        record.styleTags = whyResult.styleTags;
+        record.faithInspiration = whyResult.faithInspiration || null;
+
         var initialStock = !isEdit ? (readNum('p-initial-stock') || 0) : 0;
 
         return App.db.runAtomic(['products', 'audit_logs'], 'readwrite', function (t) {
@@ -567,6 +849,13 @@
             return stockEngine.registrarMovimentacao({
               productId: record.id, type: 'ENTRADA_INICIAL', quantity: initialStock, reason: 'Estoque inicial no cadastro do produto'
             });
+          }
+        }).then(function () {
+          // Aprendizado editorial: se o texto veio de uma geração automática e foi
+          // alterado (ou apenas aprovado), ajusta os pesos pra próxima geração —
+          // não bloqueia o salvamento se falhar (best-effort).
+          if (whyResult.learnBaseline && whyResult.text) {
+            App.core.whyAmahrEngine.registrarEdicao(whyResult.learnBaseline, whyResult.text);
           }
         }).then(function () {
           App.ui.toast(isEdit ? 'Produto atualizado.' : 'Produto criado.', 'success');

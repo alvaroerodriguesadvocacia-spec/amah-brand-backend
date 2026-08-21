@@ -514,8 +514,8 @@
     document.getElementById('d-kick').textContent = p.categoryName || 'Peça Amáh';
     document.getElementById('d-nome').textContent = p.name;
     document.getElementById('d-preco').textContent = brl(p.price);
-    document.getElementById('d-desc').textContent = p.description && p.description.trim()
-      ? p.description
+    document.getElementById('d-desc').textContent = p.whyAmahr && p.whyAmahr.trim()
+      ? p.whyAmahr
       : 'Uma peça pensada para acompanhar você em cada detalhe do seu dia — leveza, brilho e presença, do jeito Amáh de ser.';
     var chips = [];
     if (p.color) chips.push('<span class="chip">' + escapeHtml(p.color) + '</span>');
