@@ -46,7 +46,6 @@ router.get('/products', async (req, res) => {
         barcode: p.barcode || null,
         name: p.name,
         description: p.description || '',
-        whyAmahr: p.whyAmahr || '',
         color: p.color || '',
         material: p.material || '',
         categoryId: p.categoryId || null,

@@ -7,15 +7,8 @@
 
 const { Pool } = require('pg');
 
-// Bancos remotos (Render, Railway etc.) normalmente exigem SSL; localhost não.
-// rejectUnauthorized:false porque esses provedores usam certificados que a
-// cadeia de confiança padrão do Node não reconhece — é a configuração
-// recomendada pelo próprio Render para conexões vindas de fora da rede interna.
-var connectionString = process.env.DATABASE_URL;
-var isLocal = /localhost|127\.0\.0\.1/.test(connectionString || '');
-var pool = new Pool({
-  connectionString: connectionString,
-  ssl: isLocal ? false : { rejectUnauthorized: false }
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
 });
 
 // Mesma lista de entidades do js/db.js (frontend), mais "public_orders",
