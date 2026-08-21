@@ -28,7 +28,10 @@ Dica: se a senha do admin tiver `#` ou espaços, coloque-a entre aspas no
 - `POST /api/v1/auth/login` — login do time da loja (e-mail/senha) → token JWT.
 - `GET  /api/v1/auth/me` — dados do usuário autenticado.
 - `GET  /api/v1/public/products` — catálogo público (produtos ativos, com
-  estoque calculado a partir das movimentações — nunca custo/margem).
+  estoque calculado a partir das movimentações — nunca custo/margem). Inclui
+  `whyAmahr` (texto "Por que você vai Amáhr", gerado no sistema de gestão —
+  ver `js/core/whyAmahrEngine.js` no frontend; vem vazio até a equipe gerar
+  ou aprovar um texto para o produto).
 - `GET  /api/v1/public/categories` — categorias ativas.
 - `POST /api/v1/public/orders` — registra um pedido fechado na Vitrine.
 - `GET  /api/v1/admin/orders` (autenticado) — lista os pedidos da Vitrine.
