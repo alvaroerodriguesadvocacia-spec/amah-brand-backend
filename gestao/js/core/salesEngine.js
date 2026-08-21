@@ -103,6 +103,9 @@
         id: App.core.uuid(), number: saleNumberStr, customerId: params.customerId || null,
         subtotal: round2(subtotal), discountTotal: discountTotal, total: total,
         status: 'concluida', cancelReason: null, cancelledAt: null, cashSessionId: params.cashSessionId || null,
+        // Modo local (IndexedDB) não tem login/papéis — mantém o campo por
+        // consistência de formato com o modo API (ver operations.js), sempre nulo aqui.
+        sellerId: null, sellerName: null,
         createdAt: now, updatedAt: now
       };
       saleItems.forEach(function (si) { si.saleId = sale.id; });

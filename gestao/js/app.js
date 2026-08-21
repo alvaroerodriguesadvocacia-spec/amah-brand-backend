@@ -2,83 +2,101 @@
 (function (global) {
   'use strict';
 
+  // `roles` ausente = visível para qualquer papel autenticado (ou modo local,
+  // sem papéis). Itens administrativos levam roles:['admin'] explicitamente;
+  // o Modo Vendedor é a única área pensada para os dois perfis.
   var NAV = [
     {
       group: 'Principal',
       items: [
-        { path: '/dashboard', icon: '📊', label: 'Dashboard', enabled: true }
+        { path: '/dashboard', icon: '📊', label: 'Dashboard', enabled: true, roles: ['admin'] }
+      ]
+    },
+    {
+      group: 'Venda',
+      items: [
+        { path: '/vendedor', icon: '🛍️', label: 'Vender', enabled: true, roles: ['admin', 'vendedor'] }
       ]
     },
     {
       group: 'Vendas',
       items: [
-        { path: '/vendas/pdv', icon: '🛒', label: 'Nova Venda / PDV', enabled: true },
-        { path: '/vendas/historico', icon: '🧾', label: 'Histórico de vendas', enabled: true }
+        { path: '/vendas/pdv', icon: '🛒', label: 'Nova Venda / PDV (mesa)', enabled: true, roles: ['admin'] },
+        { path: '/vendas/historico', icon: '🧾', label: 'Histórico de vendas', enabled: true, roles: ['admin'] }
       ]
     },
     {
       group: 'Estoque',
       items: [
-        { path: '/produtos', icon: '💍', label: 'Produtos', enabled: true },
-        { path: '/estoque/entrada', icon: '⬇️', label: 'Entrada de mercadoria', enabled: true },
-        { path: '/estoque/saida', icon: '⬆️', label: 'Saída manual', enabled: true },
-        { path: '/estoque/movimentacoes', icon: '🔄', label: 'Movimentações', enabled: true },
-        { path: '/estoque/inventario', icon: '📋', label: 'Inventário', enabled: true },
-        { path: '/estoque/minimo', icon: '⚠️', label: 'Estoque mínimo', enabled: true },
-        { path: '/estoque/sememestoque', icon: '🚫', label: 'Sem estoque', enabled: true },
-        { path: '/estoque/encalhados', icon: '🐌', label: 'Produtos encalhados', enabled: true }
+        { path: '/produtos', icon: '💍', label: 'Produtos', enabled: true, roles: ['admin'] },
+        { path: '/estoque/entrada', icon: '⬇️', label: 'Entrada de mercadoria', enabled: true, roles: ['admin'] },
+        { path: '/estoque/saida', icon: '⬆️', label: 'Saída manual', enabled: true, roles: ['admin'] },
+        { path: '/estoque/movimentacoes', icon: '🔄', label: 'Movimentações', enabled: true, roles: ['admin'] },
+        { path: '/estoque/inventario', icon: '📋', label: 'Inventário', enabled: true, roles: ['admin'] },
+        { path: '/estoque/minimo', icon: '⚠️', label: 'Estoque mínimo', enabled: true, roles: ['admin'] },
+        { path: '/estoque/sememestoque', icon: '🚫', label: 'Sem estoque', enabled: true, roles: ['admin'] },
+        { path: '/estoque/encalhados', icon: '🐌', label: 'Produtos encalhados', enabled: true, roles: ['admin'] }
       ]
     },
     {
       group: 'Compras',
       items: [
-        { path: '/compras/nova', icon: '🧮', label: 'Nova compra', enabled: true },
-        { path: '/compras/historico', icon: '📜', label: 'Histórico', enabled: true },
-        { path: '/fornecedores', icon: '🚚', label: 'Fornecedores', enabled: true }
+        { path: '/compras/nova', icon: '🧮', label: 'Nova compra', enabled: true, roles: ['admin'] },
+        { path: '/compras/historico', icon: '📜', label: 'Histórico', enabled: true, roles: ['admin'] },
+        { path: '/fornecedores', icon: '🚚', label: 'Fornecedores', enabled: true, roles: ['admin'] }
       ]
     },
     {
       group: 'Clientes',
       items: [
-        { path: '/clientes', icon: '👥', label: 'Cadastro e histórico', enabled: true }
+        { path: '/clientes', icon: '👥', label: 'Cadastro e histórico', enabled: true, roles: ['admin'] }
       ]
     },
     {
       group: 'Financeiro',
       items: [
-        { path: '/financeiro/caixa', icon: '🗄️', label: 'Caixa', enabled: true },
-        { path: '/financeiro/receber', icon: '📥', label: 'Contas a receber', enabled: true },
-        { path: '/financeiro/pagar', icon: '📤', label: 'Contas a pagar', enabled: true },
-        { path: '/financeiro/despesas', icon: '💸', label: 'Despesas', enabled: true },
-        { path: '/financeiro/fluxo', icon: '📈', label: 'Fluxo de caixa', enabled: true }
+        { path: '/financeiro/caixa', icon: '🗄️', label: 'Caixa', enabled: true, roles: ['admin'] },
+        { path: '/financeiro/receber', icon: '📥', label: 'Contas a receber', enabled: true, roles: ['admin'] },
+        { path: '/financeiro/pagar', icon: '📤', label: 'Contas a pagar', enabled: true, roles: ['admin'] },
+        { path: '/financeiro/despesas', icon: '💸', label: 'Despesas', enabled: true, roles: ['admin'] },
+        { path: '/financeiro/fluxo', icon: '📈', label: 'Fluxo de caixa', enabled: true, roles: ['admin'] }
       ]
     },
     {
       group: 'Inteligência',
       items: [
-        { path: '/inteligencia/relatorios', icon: '📑', label: 'Relatórios', enabled: true },
-        { path: '/inteligencia/margens', icon: '🎯', label: 'Margens e lucro', enabled: true },
-        { path: '/inteligencia/abc', icon: '🔤', label: 'Curva ABC', enabled: true },
-        { path: '/inteligencia/giro', icon: '🔁', label: 'Giro de estoque', enabled: true }
+        { path: '/inteligencia/relatorios', icon: '📑', label: 'Relatórios', enabled: true, roles: ['admin'] },
+        { path: '/inteligencia/margens', icon: '🎯', label: 'Margens e lucro', enabled: true, roles: ['admin'] },
+        { path: '/inteligencia/abc', icon: '🔤', label: 'Curva ABC', enabled: true, roles: ['admin'] },
+        { path: '/inteligencia/giro', icon: '🔁', label: 'Giro de estoque', enabled: true, roles: ['admin'] }
       ]
     },
     {
       group: 'Administração',
       items: [
-        { path: '/configuracoes', icon: '⚙️', label: 'Configurações', enabled: true },
-        { path: '/categorias', icon: '🏷️', label: 'Categorias', enabled: true },
-        { path: '/backup', icon: '💾', label: 'Backup', enabled: true }
+        { path: '/configuracoes', icon: '⚙️', label: 'Configurações', enabled: true, roles: ['admin'] },
+        { path: '/categorias', icon: '🏷️', label: 'Categorias', enabled: true, roles: ['admin'] },
+        { path: '/administracao/usuarios', icon: '🔑', label: 'Usuários e vendedores', enabled: true, roles: ['admin'] },
+        { path: '/backup', icon: '💾', label: 'Backup', enabled: true, roles: ['admin'] }
       ]
     }
   ];
+
+  function navItemAllowed(item) {
+    if (!item.roles) return true;
+    if (!(global.App && App.auth && App.auth.currentRole)) return true;
+    return item.roles.indexOf(App.auth.currentRole()) !== -1;
+  }
 
   function buildSidebar() {
     var nav = document.getElementById('sidebar-nav');
     nav.innerHTML = '';
     NAV.forEach(function (group) {
+      var visibleItems = group.items.filter(navItemAllowed);
+      if (!visibleItems.length) return;
       var groupEl = App.ui.el('div', { class: 'nav-group' });
       groupEl.appendChild(App.ui.el('div', { class: 'nav-group-title' }, [group.group]));
-      group.items.forEach(function (item) {
+      visibleItems.forEach(function (item) {
         var node;
         if (item.enabled) {
           node = App.ui.el('div', {
@@ -136,47 +154,53 @@
   }
 
   function registerRoutes() {
-    App.router.register('/dashboard', { title: 'Dashboard', render: App.modules.dashboard.render });
-    App.router.register('/produtos', { title: 'Produtos', render: App.modules.products.render });
-    App.router.register('/categorias', { title: 'Categorias', render: App.modules.categories.render });
-    App.router.register('/fornecedores', { title: 'Fornecedores', render: App.modules.suppliers.render });
-    App.router.register('/configuracoes', { title: 'Configurações', render: App.modules.settings.render });
-    App.router.register('/backup', { title: 'Backup', render: App.modules.backup.render });
+    App.router.register('/dashboard', { title: 'Dashboard', render: App.modules.dashboard.render, roles: ['admin'] });
+    App.router.register('/produtos', { title: 'Produtos', render: App.modules.products.render, roles: ['admin'] });
+    App.router.register('/categorias', { title: 'Categorias', render: App.modules.categories.render, roles: ['admin'] });
+    App.router.register('/fornecedores', { title: 'Fornecedores', render: App.modules.suppliers.render, roles: ['admin'] });
+    App.router.register('/configuracoes', { title: 'Configurações', render: App.modules.settings.render, roles: ['admin'] });
+    App.router.register('/backup', { title: 'Backup', render: App.modules.backup.render, roles: ['admin'] });
 
     // Fase 3 — Vendas
-    App.router.register('/vendas/pdv', { title: 'PDV', render: App.modules.pdv.render });
-    App.router.register('/vendas/historico', { title: 'Histórico de vendas', render: App.modules.salesHistory.render });
+    App.router.register('/vendas/pdv', { title: 'PDV', render: App.modules.pdv.render, roles: ['admin'] });
+    App.router.register('/vendas/historico', { title: 'Histórico de vendas', render: App.modules.salesHistory.render, roles: ['admin'] });
+
+    // Modo Vendedor — mobile-first, reaproveita motor de vendas/estoque/clientes
+    App.router.register('/vendedor', { title: 'Vender', render: App.modules.vendedorMode.render, roles: ['admin', 'vendedor'] });
 
     // Fase 2 — Estoque
-    App.router.register('/estoque/entrada', { title: 'Entrada de mercadoria', render: App.modules.stock.renderEntrada });
-    App.router.register('/estoque/saida', { title: 'Saída manual', render: App.modules.stock.renderSaida });
-    App.router.register('/estoque/movimentacoes', { title: 'Movimentações', render: App.modules.stock.renderMovimentacoes });
-    App.router.register('/estoque/minimo', { title: 'Estoque mínimo', render: App.modules.stock.renderMinimo });
-    App.router.register('/estoque/sememestoque', { title: 'Sem estoque', render: App.modules.stock.renderSemEstoque });
-    App.router.register('/estoque/encalhados', { title: 'Produtos encalhados', render: App.modules.stock.renderEncalhados });
+    App.router.register('/estoque/entrada', { title: 'Entrada de mercadoria', render: App.modules.stock.renderEntrada, roles: ['admin'] });
+    App.router.register('/estoque/saida', { title: 'Saída manual', render: App.modules.stock.renderSaida, roles: ['admin'] });
+    App.router.register('/estoque/movimentacoes', { title: 'Movimentações', render: App.modules.stock.renderMovimentacoes, roles: ['admin'] });
+    App.router.register('/estoque/minimo', { title: 'Estoque mínimo', render: App.modules.stock.renderMinimo, roles: ['admin'] });
+    App.router.register('/estoque/sememestoque', { title: 'Sem estoque', render: App.modules.stock.renderSemEstoque, roles: ['admin'] });
+    App.router.register('/estoque/encalhados', { title: 'Produtos encalhados', render: App.modules.stock.renderEncalhados, roles: ['admin'] });
 
     // Fase 6 — Inventário
-    App.router.register('/estoque/inventario', { title: 'Inventário', render: App.modules.inventoryCount.render });
+    App.router.register('/estoque/inventario', { title: 'Inventário', render: App.modules.inventoryCount.render, roles: ['admin'] });
 
     // Fase 3 — Clientes
-    App.router.register('/clientes', { title: 'Clientes', render: App.modules.customers.render });
+    App.router.register('/clientes', { title: 'Clientes', render: App.modules.customers.render, roles: ['admin'] });
 
     // Fase 4 — Financeiro
-    App.router.register('/financeiro/caixa', { title: 'Caixa', render: App.modules.cashRegister.render });
-    App.router.register('/financeiro/receber', { title: 'Contas a receber', render: App.modules.financeReceivable.render });
-    App.router.register('/financeiro/pagar', { title: 'Contas a pagar', render: App.modules.financePayable.render });
-    App.router.register('/financeiro/despesas', { title: 'Despesas', render: App.modules.financeExpenses.render });
-    App.router.register('/financeiro/fluxo', { title: 'Fluxo de caixa', render: App.modules.financeFlow.render });
+    App.router.register('/financeiro/caixa', { title: 'Caixa', render: App.modules.cashRegister.render, roles: ['admin'] });
+    App.router.register('/financeiro/receber', { title: 'Contas a receber', render: App.modules.financeReceivable.render, roles: ['admin'] });
+    App.router.register('/financeiro/pagar', { title: 'Contas a pagar', render: App.modules.financePayable.render, roles: ['admin'] });
+    App.router.register('/financeiro/despesas', { title: 'Despesas', render: App.modules.financeExpenses.render, roles: ['admin'] });
+    App.router.register('/financeiro/fluxo', { title: 'Fluxo de caixa', render: App.modules.financeFlow.render, roles: ['admin'] });
 
     // Fase 5 — Compras
-    App.router.register('/compras/nova', { title: 'Nova compra', render: App.modules.purchases.renderNew });
-    App.router.register('/compras/historico', { title: 'Histórico de compras', render: App.modules.purchases.renderHistory });
+    App.router.register('/compras/nova', { title: 'Nova compra', render: App.modules.purchases.renderNew, roles: ['admin'] });
+    App.router.register('/compras/historico', { title: 'Histórico de compras', render: App.modules.purchases.renderHistory, roles: ['admin'] });
 
     // Fase 7 — Inteligência
-    App.router.register('/inteligencia/relatorios', { title: 'Relatórios', render: App.modules.reports.renderRelatorios });
-    App.router.register('/inteligencia/margens', { title: 'Margens e lucro', render: App.modules.reports.renderMargens });
-    App.router.register('/inteligencia/abc', { title: 'Curva ABC', render: App.modules.reports.renderAbc });
-    App.router.register('/inteligencia/giro', { title: 'Giro de estoque', render: App.modules.reports.renderGiro });
+    App.router.register('/inteligencia/relatorios', { title: 'Relatórios', render: App.modules.reports.renderRelatorios, roles: ['admin'] });
+    App.router.register('/inteligencia/margens', { title: 'Margens e lucro', render: App.modules.reports.renderMargens, roles: ['admin'] });
+    App.router.register('/inteligencia/abc', { title: 'Curva ABC', render: App.modules.reports.renderAbc, roles: ['admin'] });
+    App.router.register('/inteligencia/giro', { title: 'Giro de estoque', render: App.modules.reports.renderGiro, roles: ['admin'] });
+
+    // Administração — usuários e vendedores
+    App.router.register('/administracao/usuarios', { title: 'Usuários', render: App.modules.users.render, roles: ['admin'] });
   }
 
   function setupGlobalSearch() {
@@ -277,12 +301,17 @@
 
   function renderShell() {
     var root = document.getElementById('root');
+    var vendedor = global.App && App.auth && App.auth.isVendedor && App.auth.isVendedor();
+    // Modo Vendedor não usa a busca global (leva pra tela de Produtos, que é
+    // administrativa) — a própria tela /vendedor tem sua busca dedicada.
+    var searchHtml = vendedor ? '' :
+      '<div class="global-search"><span class="icon">🔍</span><input id="global-search-input" placeholder="Buscar produto por nome, SKU ou código de barras…" /></div>';
     root.innerHTML =
-      '<div id="app-shell">' +
+      '<div id="app-shell"' + (vendedor ? ' class="shell-vendedor"' : '') + '>' +
       '  <aside class="sidebar" id="sidebar">' +
       '    <div class="sidebar-brand">' +
       '      <div class="logo-mark">♡</div>' +
-      '      <div><div class="brand-name">AMÁH <span style="font-weight:400;opacity:.85;">Brand</span></div><div class="brand-sub">Gestão completa</div></div>' +
+      '      <div><div class="brand-name">AMÁH <span style="font-weight:400;opacity:.85;">Brand</span></div><div class="brand-sub">' + (vendedor ? 'Modo Vendedor' : 'Gestão completa') + '</div></div>' +
       '    </div>' +
       '    <nav class="sidebar-nav" id="sidebar-nav"></nav>' +
       '    <div class="sidebar-footer">v0.1.0 · ' + (App.api && App.api.enabled ? 'dados salvos na nuvem AMÁH' : 'dados salvos neste dispositivo') + '</div>' +
@@ -290,7 +319,7 @@
       '  <div class="main-area">' +
       '    <header class="topbar">' +
       '      <button class="topbar-menu-btn" id="menu-toggle-btn">☰</button>' +
-      '      <div class="global-search"><span class="icon">🔍</span><input id="global-search-input" placeholder="Buscar produto por nome, SKU ou código de barras…" /></div>' +
+      searchHtml +
       '      <div class="topbar-spacer"></div>' +
       '      <div class="topbar-actions"><span class="env-badge" id="demo-badge" style="display:none;">DEMONSTRAÇÃO</span><span id="user-badge"></span></div>' +
       '    </header>' +
@@ -333,6 +362,16 @@
   function startApp() {
     renderShell();
     registerRoutes();
+    // Vendedor sempre cai direto na tela de venda — a única área que esse
+    // papel acessa em toda a Fase 1 do Modo Vendedor. Cobre qualquer hash
+    // deixado no navegador (aba antiga, link direto, hash padrão vazio),
+    // não só o caso mais comum ('/dashboard') — sem isso, um vendedor que
+    // logasse com a URL apontando pra uma tela administrativa via
+    // "Acesso restrito" em vez de cair direto pra vender.
+    if (global.App && App.auth && App.auth.isVendedor && App.auth.isVendedor()) {
+      var hash = (global.location.hash || '').replace(/^#/, '');
+      if (hash !== '/vendedor') global.location.hash = '/vendedor';
+    }
     App.router.init(document.getElementById('view-container'));
     refreshDemoBadge();
   }

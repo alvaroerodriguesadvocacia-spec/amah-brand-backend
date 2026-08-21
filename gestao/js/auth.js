@@ -84,10 +84,23 @@
     if (global.App.boot) global.App.boot();
   }
 
+  // Papel do usuário logado (Modo Vendedor, Fase D). No modo local
+  // (IndexedDB/file://, sem API) não existe conceito de papel — sempre
+  // 'admin', preservando 100% do comportamento atual desse modo.
+  function currentRole() {
+    if (!(App.api && App.api.enabled)) return 'admin';
+    var user = App.api.getUser();
+    return (user && user.role) || 'admin';
+  }
+
+  function isVendedor() { return currentRole() === 'vendedor'; }
+
   global.App = global.App || {};
   global.App.auth = {
     ensureAuthenticated: ensureAuthenticated,
     handleUnauthorized: handleUnauthorized,
-    logout: logout
+    logout: logout,
+    currentRole: currentRole,
+    isVendedor: isVendedor
   };
 })(window);

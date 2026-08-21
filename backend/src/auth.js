@@ -1,44 +1,28 @@
-/* AMÁH Brand — backend: autenticação JWT (Fase 10, ARQUITETURA.md §9). */
+/* AMÁH Brand — backend: login/sessão do sistema de gestão (admin). */
 'use strict';
 
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { pool } = require('./db');
+const express = require('express');
+const { findUserByEmail, verifyPassword, signToken, requireAuth } = require('../auth');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-nao-use-em-producao';
-const TOKEN_TTL = '12h';
+const router = express.Router();
 
-function hashPassword(plain) {
-  return bcrypt.hash(plain, 10);
-}
-
-function verifyPassword(plain, hash) {
-  return bcrypt.compare(plain, hash);
-}
-
-function signToken(user) {
-  return jwt.sign({ sub: user.id, email: user.email, role: user.role, name: user.name }, JWT_SECRET, { expiresIn: TOKEN_TTL });
-}
-
-async function findUserByEmail(email) {
-  const result = await pool.query('SELECT * FROM users WHERE email = $1', [String(email || '').toLowerCase()]);
-  return result.rows[0] || null;
-}
-
-// Middleware: exige um token válido em "Authorization: Bearer <token>".
-function requireAuth(req, res, next) {
-  const header = req.headers.authorization || '';
-  const parts = header.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    return res.status(401).json({ error: 'Autenticação necessária. Envie o token no cabeçalho Authorization.' });
-  }
+router.post('/login', async (req, res) => {
   try {
-    const payload = jwt.verify(parts[1], JWT_SECRET);
-    req.user = payload;
-    next();
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ error: 'Informe e-mail e senha.' });
+    const user = await findUserByEmail(email);
+    if (!user || !user.active) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+    const ok = await verifyPassword(password, user.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Usuário ou senha inválidos.' });
+    const token = signToken(user);
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   } catch (err) {
-    return res.status(401).json({ error: 'Token inválido ou expirado. Faça login novamente.' });
+    res.status(500).json({ error: err.message });
   }
-}
+});
 
-module.exports = { hashPassword, verifyPassword, signToken, findUserByEmail, requireAuth, JWT_SECRET };
+router.get('/me', requireAuth, (req, res) => {
+  res.json({ id: req.user.sub, email: req.user.email, name: req.user.name, role: req.user.role });
+});
+
+module.exports = router;

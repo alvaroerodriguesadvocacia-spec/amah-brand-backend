@@ -32,6 +32,17 @@
       container.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>Página não encontrada</h3><p>A seção solicitada não existe ou ainda não foi implementada.</p></div>';
       return;
     }
+    // Guarda de papel (Modo Vendedor, Fase D): rotas registradas com `roles`
+    // só renderizam para quem tem o papel permitido. Sem App.auth (ex.: testes
+    // isolados) ou sem `roles` na rota, nada muda — comportamento atual preservado.
+    if (def.roles && global.App && App.auth && App.auth.currentRole) {
+      var role = App.auth.currentRole();
+      if (def.roles.indexOf(role) === -1) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">🔒</div><h3>Acesso restrito</h3><p>Esta área não está disponível para o seu perfil de usuário.</p></div>';
+        if (global.App && App.updateActiveNav) App.updateActiveNav(parsed.path);
+        return;
+      }
+    }
     try {
       def.render(container, parsed.params);
     } catch (err) {

@@ -55,6 +55,11 @@
       lastAt = now;
       lastReadRow.innerHTML = '';
       lastReadRow.appendChild(App.ui.el('span', { class: 'badge badge-success' }, ['Lido (' + sourceLabel + '): ' + code]));
+      if (sourceLabel === 'câmera') {
+        // Feedback tátil na leitura por câmera (item 9.9) — no-op silencioso em
+        // dispositivos/navegadores sem suporte a vibração (ex.: desktop, iOS Safari).
+        try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
+      }
       if (options.onDetect) options.onDetect(code);
     }
 

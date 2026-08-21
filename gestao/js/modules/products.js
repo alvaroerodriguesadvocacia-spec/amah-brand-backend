@@ -259,14 +259,33 @@
   function openPrintLabels(product) {
     var code = product.barcode || product.sku;
     var qtyInput = App.ui.el('input', { id: 'label-qty', type: 'number', min: '1', value: '10' });
+    var typeSelect = App.ui.el('select', { id: 'label-codetype' }, [
+      App.ui.el('option', { value: 'qr', selected: 'selected' }, ['QR Code (recomendado)']),
+      App.ui.el('option', { value: 'barcode' }, ['Código de barras']),
+      App.ui.el('option', { value: 'both' }, ['Os dois'])
+    ]);
     var preview = App.ui.el('div', { style: 'margin-top:10px; padding:10px; border:1px dashed var(--color-border); border-radius:8px; text-align:center;' });
-    try { preview.innerHTML = App.core.labels.svgBarcode(code); } catch (e) {}
+    function refreshPreview() {
+      preview.innerHTML = '';
+      try {
+        if (typeSelect.value === 'barcode') {
+          preview.innerHTML = App.core.labels.svgBarcode(code);
+        } else {
+          var qr = App.core.labels.qrDataUrl(code);
+          if (qr) preview.appendChild(App.ui.el('img', { src: qr, style: 'width:120px;height:120px;' }));
+          if (typeSelect.value === 'both') preview.innerHTML += App.core.labels.svgBarcode(code);
+        }
+      } catch (e) {}
+    }
+    typeSelect.addEventListener('change', refreshPreview);
+    refreshPreview();
     var body = App.ui.el('div', {}, [
       App.ui.el('div', { class: 'form-grid' }, [
         App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, ['Quantidade de etiquetas']), qtyInput]),
-        App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, ['Código utilizado']), App.ui.el('input', { value: code, disabled: 'disabled' })])
+        App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, ['Código utilizado']), App.ui.el('input', { value: code, disabled: 'disabled' })]),
+        App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, ['Tipo de código na etiqueta']), typeSelect])
       ]),
-      App.ui.el('div', { class: 'hint' }, ['Prévia (Code128) — a impressão abrirá em uma nova janela.']),
+      App.ui.el('div', { class: 'hint' }, ['Prévia — a impressão abrirá em uma nova janela. O scanner do sistema lê os dois formatos normalmente.']),
       preview
     ]);
     App.ui.openModal({
@@ -277,7 +296,7 @@
         {
           label: 'Gerar e imprimir', className: 'btn-primary', onClick: function (close) {
             var qty = Math.max(1, Number(qtyInput.value) || 1);
-            App.core.labels.printLabels([{ product: product, qty: qty }]);
+            App.core.labels.printLabels([{ product: product, qty: qty }], { codeType: typeSelect.value });
             close();
           }
         }
@@ -764,6 +783,38 @@
         whyAmahr.node
       ]);
       wrapper.appendChild(form);
+
+      // Sugestão de código (Fase B — padronização): só no cadastro de produto
+      // NOVO, e só preenche automaticamente enquanto o campo está vazio. Nunca
+      // mexe no código de um produto já existente (imutabilidade preservada).
+      // O banco continua sendo quem garante unicidade de verdade (skuUnico +
+      // índice único em store_products.sku) — isto aqui é só uma sugestão.
+      if (!isEdit) {
+        var skuFieldInput = form.querySelector('#p-sku');
+        var categorySelectEl = form.querySelector('#p-category');
+        var skuFieldWrap = skuFieldInput ? skuFieldInput.closest('.form-field') : null;
+        if (skuFieldInput && categorySelectEl && skuFieldWrap) {
+          var suggestBtn = App.ui.el('button', {
+            type: 'button', class: 'btn btn-ghost btn-sm', style: 'margin-top:6px;',
+            onclick: function () { applyCodeSuggestion(true); }
+          }, ['✨ Sugerir código']);
+          skuFieldWrap.appendChild(suggestBtn);
+
+          function applyCodeSuggestion(force) {
+            if (!force && skuFieldInput.value.trim()) return;
+            var catId = categorySelectEl.value;
+            var cat = categories.filter(function (c) { return c.id === catId; })[0];
+            if (!cat) {
+              if (force) App.ui.toast('Selecione uma categoria antes de sugerir o código.', 'warning');
+              return;
+            }
+            var prefix = App.core.productCodes.getPrefixFor(cat.name);
+            skuFieldInput.value = App.core.productCodes.suggestNext(prefix, cache.products);
+          }
+
+          categorySelectEl.addEventListener('change', function () { applyCodeSuggestion(false); });
+        }
+      }
     });
 
     App.ui.openModal({

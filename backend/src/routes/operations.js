@@ -14,10 +14,17 @@
 const express = require('express');
 const crypto = require('crypto');
 const { pool } = require('../db');
-const { requireAuth } = require('../auth');
+const { requireAuth, requireRole } = require('../auth');
 
 const router = express.Router();
 router.use(requireAuth);
+
+// Ações sensíveis (Modo Vendedor, item "sensível para v2"): cancelamento de
+// venda concluída, devolução/estorno, qualquer operação de compra e ajuste
+// manual de estoque por inventário exigem o perfil administrador. Vender
+// (sales/finalize) e operar o caixa continuam liberados para o vendedor —
+// é o núcleo da operação dele.
+const adminOnly = requireRole('admin');
 
 function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
 function nowIso() { return new Date().toISOString(); }
@@ -205,6 +212,12 @@ router.post('/sales/finalize', txRoute(async (client, req) => {
     id: uuid(), number: saleNumberStr, customerId: params.customerId || null,
     subtotal: round2(subtotal), discountTotal: discountTotal, total: total,
     status: 'concluida', cancelReason: null, cancelledAt: null, cashSessionId: params.cashSessionId || null,
+    // Vendedor + data/hora (item 24 do diagnóstico): sempre o usuário autenticado
+    // que finalizou a venda — não depende do chamador informar nada, então toda
+    // venda feita hoje (Modo Gestão) e no futuro Modo Vendedor já sai atribuída,
+    // preparando relatórios por vendedor sem precisar de migração depois.
+    sellerId: (req.user && req.user.sub) || null,
+    sellerName: (req.user && req.user.name) || (req.user && req.user.email) || null,
     createdAt: now, updatedAt: now
   };
   saleItems.forEach((si) => { si.saleId = sale.id; });
@@ -270,7 +283,7 @@ router.post('/sales/finalize', txRoute(async (client, req) => {
   return sale;
 }));
 
-router.post('/sales/:id/cancel', txRoute(async (client, req) => {
+router.post('/sales/:id/cancel', adminOnly, txRoute(async (client, req) => {
   const reason = (req.body && req.body.reason) || '';
   if (!reason.trim()) throw httpError(400, 'Informe o motivo do cancelamento.');
   const sale = await getRow(client, 'store_sales', req.params.id, true);
@@ -317,7 +330,7 @@ router.post('/sales/:id/cancel', txRoute(async (client, req) => {
   return updatedSale;
 }));
 
-router.post('/sales/items/:id/return', txRoute(async (client, req) => {
+router.post('/sales/items/:id/return', adminOnly, txRoute(async (client, req) => {
   const qty = Number(req.body && req.body.qty);
   const reason = (req.body && req.body.reason) || '';
   if (!reason.trim()) throw httpError(400, 'Informe o motivo da devolução.');
@@ -366,7 +379,7 @@ router.post('/sales/items/:id/return', txRoute(async (client, req) => {
 /* Compras (PurchaseEngine)                                                */
 /* ---------------------------------------------------------------------- */
 
-router.post('/purchases', txRoute(async (client, req) => {
+router.post('/purchases', adminOnly, txRoute(async (client, req) => {
   const params = req.body || {};
   const items = params.items || [];
   if (!params.supplierId) throw httpError(400, 'Selecione um fornecedor.');
@@ -413,7 +426,7 @@ router.post('/purchases', txRoute(async (client, req) => {
   return purchase;
 }));
 
-router.post('/purchases/:id/receive', txRoute(async (client, req) => {
+router.post('/purchases/:id/receive', adminOnly, txRoute(async (client, req) => {
   const receivedQtyByItemId = (req.body && req.body.receivedQtyByItemId) || {};
   const options = (req.body && req.body.options) || {};
   const purchase = await getRow(client, 'store_purchases', req.params.id, true);
@@ -484,7 +497,7 @@ router.post('/purchases/:id/receive', txRoute(async (client, req) => {
   return updatedPurchase;
 }));
 
-router.post('/purchases/:id/cancel', txRoute(async (client, req) => {
+router.post('/purchases/:id/cancel', adminOnly, txRoute(async (client, req) => {
   const reason = (req.body && req.body.reason) || '';
   const purchase = await getRow(client, 'store_purchases', req.params.id, true);
   if (!purchase) throw httpError(404, 'Compra não encontrada.');
@@ -605,7 +618,7 @@ router.get('/inventory/count/:id/divergences', txRoute(async (client, req) => {
   return items.map((i) => Object.assign({}, i, { difference: i.countedQty - i.systemQty }));
 }));
 
-router.post('/inventory/count/:id/confirm-adjustments', txRoute(async (client, req) => {
+router.post('/inventory/count/:id/confirm-adjustments', adminOnly, txRoute(async (client, req) => {
   const stockCountId = req.params.id;
   const itemIds = (req.body && req.body.itemIds) || [];
   const items = await getByIndex(client, 'store_stock_count_items', 'stockCountId', stockCountId, true);
