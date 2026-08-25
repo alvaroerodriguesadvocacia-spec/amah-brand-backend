@@ -749,9 +749,9 @@
         inputField('p-material', 'Material', existing && existing.material),
 
         App.ui.el('div', { class: 'form-section-title' }, ['Custos e preços']),
-        inputField('p-cost', 'Custo de aquisição (R$) *', existing ? existing.cost : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
+        inputField('p-cost', 'Custo de aquisição (R$)', existing ? existing.cost : '', { attrs: { type: 'number', step: '0.01', min: '0', placeholder: 'Pode preencher depois' } }),
         inputField('p-addcost', 'Custos adicionais (R$)', existing ? existing.additionalCosts : '0', { attrs: { type: 'number', step: '0.01', min: '0' } }),
-        inputField('p-retail', 'Preço de varejo (R$) *', existing ? existing.retailPrice : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
+        inputField('p-retail', 'Preço de varejo (R$)', existing ? existing.retailPrice : '', { attrs: { type: 'number', step: '0.01', min: '0', placeholder: 'Pode preencher depois' } }),
         inputField('p-wholesale', 'Preço de atacado (R$)', existing ? existing.wholesalePrice : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
         inputField('p-promo', 'Preço promocional (R$)', existing ? existing.promoPrice : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
 
@@ -837,12 +837,16 @@
       var cost = readNum('p-cost');
       var retail = readNum('p-retail');
 
+      // Custo e preço de varejo deixaram de ser obrigatórios no cadastro rápido
+      // (a pedido da usuária: fotografar + nomear + categorizar primeiro, e
+      // preencher preço depois com calma) — ficam 0 até serem editados na tela
+      // do produto. Nenhuma outra validação/campo foi alterado.
+      if (cost == null) cost = 0;
+      if (retail == null) retail = 0;
       try {
         App.core.validation.required(name, 'Nome do produto');
         App.core.validation.required(sku, 'Código/SKU');
-        if (cost == null) throw new Error('Custo de aquisição é obrigatório.');
         App.core.validation.positiveNumber(cost, 'Custo de aquisição', true);
-        if (retail == null) throw new Error('Preço de varejo é obrigatório.');
         App.core.validation.positiveNumber(retail, 'Preço de varejo', true);
       } catch (err) {
         errorBox.textContent = err.message; errorBox.classList.remove('hidden'); return;
