@@ -8,6 +8,7 @@
   var fmt = App.core.format;
 
   function startCount(notes) {
+    if (App.api && App.api.enabled) return App.api.operations.inventoryCountStart(notes);
     return App.db.getAll('stock_counts').then(function (all) {
       var open = all.filter(function (c) { return c.status === 'em_andamento'; })[0];
       if (open) return open; // reaproveita contagem em andamento
@@ -17,8 +18,22 @@
   }
 
   // Acrescenta (soma) uma leitura ao item de contagem do produto, criando-o se necessário.
+  //
+  // No modo API, delega pra rota transacional do backend
+  // (/operations/inventory/count/:id/reading) em vez de fazer aqui um
+  // "busca a lista inteira, acha o item, salva" em duas chamadas HTTP
+  // separadas sem transação nenhuma no meio. Antes desta correção era
+  // exatamente isso que acontecia — e como não há trava nenhuma entre o
+  // GET e o PUT, duas leituras próximas no tempo (duplo clique em
+  // "Adicionar todos os produtos", ou a tela ainda buscando a lista
+  // atualizada enquanto outra leitura é digitada) podiam cada uma concluir
+  // "esse produto ainda não tem item" e criar dois itens para o mesmo
+  // produto na mesma contagem — a duplicata que a usuária via na tela, com
+  // a edição de uma delas parecendo "não salvar" porque a outra cópia
+  // continuava mostrando o valor antigo (2026-08-26).
   function addReading(stockCountId, productId, qty) {
     qty = Number(qty) || 1;
+    if (App.api && App.api.enabled) return App.api.operations.inventoryCountReading(stockCountId, { productId: productId, mode: 'add', qty: qty });
     return App.db.getByIndex('stock_count_items', 'stockCountId', stockCountId).then(function (items) {
       var existing = items.filter(function (i) { return i.productId === productId; })[0];
       if (existing) {
@@ -36,6 +51,7 @@
   }
 
   function setReading(stockCountId, productId, countedQty) {
+    if (App.api && App.api.enabled) return App.api.operations.inventoryCountReading(stockCountId, { productId: productId, mode: 'set', qty: countedQty });
     return App.db.getByIndex('stock_count_items', 'stockCountId', stockCountId).then(function (items) {
       var existing = items.filter(function (i) { return i.productId === productId; })[0];
       if (existing) {
@@ -50,6 +66,7 @@
   }
 
   function getDivergences(stockCountId) {
+    if (App.api && App.api.enabled) return App.api.operations.inventoryCountDivergences(stockCountId);
     return App.db.getByIndex('stock_count_items', 'stockCountId', stockCountId).then(function (items) {
       return items.map(function (i) { return Object.assign({}, i, { difference: i.countedQty - i.systemQty }); });
     });
@@ -81,6 +98,7 @@
   }
 
   function finishCount(stockCountId) {
+    if (App.api && App.api.enabled) return App.api.operations.inventoryCountFinish(stockCountId);
     return App.db.getById('stock_counts', stockCountId).then(function (count) {
       if (!count) throw new Error('Inventário não encontrado.');
       var updated = Object.assign({}, count, { status: 'concluido', finishedAt: fmt.nowIso() });

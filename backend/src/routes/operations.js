@@ -629,7 +629,33 @@ router.post('/inventory/count/:id/reading', adminOnly, txRoute(async (client, re
 
   const systemQty = await saldoProduto(client, productId);
   const item = { id: uuid(), stockCountId: stockCountId, productId: productId, systemQty: systemQty, countedQty: mode === 'set' ? (Number(qty) || 0) : (Number(qty) || 1) };
-  await putRow(client, 'store_stock_count_items', item.id, item);
+  // Corrida rara: outra requisição pode criar o item pro mesmo produto
+  // entre o SELECT acima e este INSERT — o índice único de banco
+  // (store_stock_count_items_unique_idx) barra a duplicata em vez de
+  // deixar criar. Um SAVEPOINT antes da tentativa permite recuar só esse
+  // pedaço (sem abortar a transação inteira, que faria qualquer comando
+  // seguinte falhar com "current transaction is aborted") e convergir: lê
+  // o item que "ganhou" a corrida e aplica esta leitura nele, em vez de
+  // devolver erro pra usuária (2026-08-26).
+  await client.query('SAVEPOINT reading_insert');
+  try {
+    await putRow(client, 'store_stock_count_items', item.id, item);
+    await client.query('RELEASE SAVEPOINT reading_insert');
+  } catch (err) {
+    if (err && err.code === '23505') {
+      await client.query('ROLLBACK TO SAVEPOINT reading_insert');
+      const again = await getByIndex(client, 'store_stock_count_items', 'stockCountId', stockCountId, true);
+      const race = again.filter((i) => i.productId === productId)[0];
+      if (race) {
+        const merged = Object.assign({}, race, {
+          countedQty: mode === 'set' ? (Number(qty) || 0) : (race.countedQty || 0) + (Number(qty) || 1)
+        });
+        await putRow(client, 'store_stock_count_items', merged.id, merged);
+        return merged;
+      }
+    }
+    throw err;
+  }
   return item;
 }));
 

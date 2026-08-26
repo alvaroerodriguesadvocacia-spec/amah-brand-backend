@@ -120,15 +120,22 @@
       App.ui.el('div', { class: 'card-header' }, [
         App.ui.el('h2', {}, ['Itens lidos / divergências']),
         App.ui.el('div', { class: 'row-actions' }, [
-          App.ui.el('button', { class: 'btn btn-secondary btn-sm', onclick: addAllUncounted }, ['+ Adicionar todos os produtos (contagem zero)']),
-          App.ui.el('button', { class: 'btn btn-primary btn-sm', onclick: openConfirmAdjustments }, ['✔ Confirmar ajustes selecionados'])
+          App.ui.el('button', {
+            // guardClick evita duplo clique/duplo toque disparando duas
+            // rodadas de "adicionar todos" ao mesmo tempo — era exatamente
+            // isso que podia gerar produto duplicado na lista (2026-08-26).
+            class: 'btn btn-secondary btn-sm', onclick: function (e) { if (App.ui.guardClick(e.currentTarget)) addAllUncounted(); }
+          }, ['+ Adicionar todos os produtos (contagem zero)']),
+          App.ui.el('button', {
+            class: 'btn btn-primary btn-sm', onclick: function (e) { if (App.ui.guardClick(e.currentTarget)) openConfirmAdjustments(); }
+          }, ['✔ Confirmar ajustes selecionados'])
         ])
       ]),
       listBody
     ]));
 
     body.appendChild(App.ui.el('div', { class: 'card-body' }, [
-      App.ui.el('button', { class: 'btn btn-ghost', onclick: finishCount }, ['🏁 Finalizar contagem'])
+      App.ui.el('button', { class: 'btn btn-ghost', onclick: function (e) { if (App.ui.guardClick(e.currentTarget)) finishCount(); } }, ['🏁 Finalizar contagem'])
     ]));
 
     renderItemsTable();
