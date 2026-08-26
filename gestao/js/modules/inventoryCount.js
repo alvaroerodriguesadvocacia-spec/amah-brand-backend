@@ -178,7 +178,17 @@
       App.ui.el('th', {}, ['Contado']), App.ui.el('th', {}, ['Diferença']), App.ui.el('th', {}, ['Status'])
     ])]));
     var tbody = App.ui.el('tbody');
-    state.items.slice().sort(function (a, b) { return Math.abs(b.difference) - Math.abs(a.difference); }).forEach(function (i) {
+    // Ordem alfabética por nome do produto — fixa, não muda conforme a
+    // diferença de cada item é editada. Antes a lista era ordenada por
+    // "maior diferença primeiro", o que fazia cada linha pular de posição
+    // assim que a pessoa digitava uma quantidade contada: parecia que o
+    // valor "voltava a zero", quando na verdade uma peça ainda não contada
+    // (diferença zero) tinha acabado de ocupar aquela posição da tela.
+    state.items.slice().sort(function (a, b) {
+      var pa = state.productIndex.byId[a.productId];
+      var pb = state.productIndex.byId[b.productId];
+      return (pa ? pa.name : '').localeCompare(pb ? pb.name : '', 'pt-BR');
+    }).forEach(function (i) {
       var p = state.productIndex.byId[i.productId];
       var checkbox = App.ui.el('input', { type: 'checkbox', 'data-item-id': i.id, disabled: i.difference === 0 ? 'disabled' : undefined });
       var countedInput = App.ui.el('input', { type: 'number', min: '0', value: String(i.countedQty), style: 'width:80px;' });
