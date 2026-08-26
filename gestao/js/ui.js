@@ -32,6 +32,21 @@
     return node;
   }
 
+  // Impede clique duplo / duplo toque enquanto uma ação ainda está em
+  // andamento (evita duplicar venda, compra, movimentação de estoque,
+  // abertura de caixa etc. — muitos botões de salvar disparam uma promessa
+  // e só voltam a reagir quando ela termina, sem travar o botão nesse meio
+  // tempo). Retorna true se o clique deve prosseguir (e já trava o botão);
+  // false se já havia um clique em andamento (ignora este). Reabilita
+  // sozinho depois de `ms` — nunca trava o botão pra sempre, mesmo se quem
+  // chamou esquecer de reabilitar no caminho de erro (2026-08-26).
+  function guardClick(btn, ms) {
+    if (!btn || btn.disabled) return false;
+    btn.disabled = true;
+    setTimeout(function () { btn.disabled = false; }, ms || 1500);
+    return true;
+  }
+
   var activeModalStack = [];
 
   function closeTopModal() {
@@ -63,6 +78,7 @@
         var btn = el('button', {
           class: 'btn ' + (btnDef.className || 'btn-secondary'),
           onclick: function () {
+            if (!guardClick(btn)) return; // evita clique duplo disparar o mesmo salvar/confirmar duas vezes
             if (btnDef.onClick) btnDef.onClick(closeModal);
             else closeModal();
           }
@@ -109,5 +125,5 @@
   }
 
   global.App = global.App || {};
-  global.App.ui = { toast: toast, el: el, openModal: openModal, confirmDialog: confirmDialog };
+  global.App.ui = { toast: toast, el: el, openModal: openModal, confirmDialog: confirmDialog, guardClick: guardClick };
 })(window);

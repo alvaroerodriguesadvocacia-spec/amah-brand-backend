@@ -55,7 +55,9 @@
     container.appendChild(searchCard);
 
     var listBody = App.ui.el('div', { class: 'card-body', id: 'mv-list-body' });
-    var confirmBtn = App.ui.el('button', { class: 'btn btn-primary', onclick: confirm }, ['✔ Confirmar movimentação']);
+    // guardClick evita clique duplo/duplo toque duplicando a movimentação de
+    // estoque (2026-08-26).
+    var confirmBtn = App.ui.el('button', { class: 'btn btn-primary', onclick: function () { if (App.ui.guardClick(confirmBtn)) confirm(); } }, ['✔ Confirmar movimentação']);
     container.appendChild(App.ui.el('div', { class: 'card' }, [
       App.ui.el('div', { class: 'card-header' }, [App.ui.el('h2', {}, ['Itens a movimentar']), confirmBtn]),
       listBody

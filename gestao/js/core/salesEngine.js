@@ -51,7 +51,11 @@
         var product = productMap[it.productId];
         if (!product.active) throw new Error('Produto "' + product.name + '" está inativo e não pode ser vendido.');
         var qty = App.core.validation.positiveNumber(it.qty, 'Quantidade de "' + product.name + '"');
-        var unitPrice = App.core.validation.positiveNumber(it.unitPrice, 'Preço de "' + product.name + '"', true);
+        // allowZero=false: uma peça sem preço definido (fica 0 até alguém
+        // preencher, ver products.js) não pode ser vendida de graça por
+        // engano — pra desconto total de propósito, usa-se o campo
+        // "desconto" do item (2026-08-26).
+        var unitPrice = App.core.validation.positiveNumber(it.unitPrice, 'Preço de "' + product.name + '"', false);
         var discount = Number(it.discount) || 0;
         var lineTotal = round2(qty * unitPrice - discount);
         if (lineTotal < 0) throw new Error('Desconto maior que o valor do item "' + product.name + '".');

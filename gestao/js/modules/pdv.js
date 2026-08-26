@@ -157,6 +157,13 @@
 
   function addProductToCart(product) {
     if (!product.active) { App.ui.toast('Produto "' + product.name + '" está inativo.', 'error'); return; }
+    // Peça sem preço definido (fica em R$ 0,00 até alguém preencher em
+    // Produtos) não pode ser vendida — avisa aqui, na hora de adicionar, em
+    // vez de só travar depois no "Finalizar Venda" (2026-08-26).
+    if (!(Number(product.retailPrice) > 0)) {
+      App.ui.toast('"' + product.name + '" ainda não tem preço definido — defina o preço de varejo em Produtos antes de vender.', 'error');
+      return;
+    }
     var existing = state.cart.filter(function (i) { return i.productId === product.id; })[0];
     var available = state.productIndex.stockMap[product.id] || 0;
     if (existing) existing.qty += 1;
@@ -251,7 +258,9 @@
     var paymentRows = App.ui.el('div', { id: 'pdv-payment-rows' });
     renderPaymentRows(paymentRows, totals);
 
-    var finalizeBtn = App.ui.el('button', { class: 'btn btn-primary btn-lg', onclick: finalizeSale }, ['✔ Finalizar Venda']);
+    // guardClick evita clique duplo/duplo toque disparando duas vendas
+    // (2026-08-26).
+    var finalizeBtn = App.ui.el('button', { class: 'btn btn-primary btn-lg', onclick: function () { if (App.ui.guardClick(finalizeBtn)) finalizeSale(); } }, ['✔ Finalizar Venda']);
     finalizeBtn.disabled = state.cart.length === 0;
 
     col.appendChild(App.ui.el('div', { class: 'card' }, [

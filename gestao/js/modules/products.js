@@ -809,7 +809,14 @@
               return;
             }
             var prefix = App.core.productCodes.getPrefixFor(cat.name);
-            skuFieldInput.value = App.core.productCodes.suggestNext(prefix, cache.products);
+            // Busca a lista de produtos na hora, em vez de usar cache.products
+            // (que só é atualizado quando a tela de lista recarrega) — sem
+            // isso, cadastrar duas peças em sequência rápida (antes do
+            // primeiro salvar terminar de recarregar a lista) podia sugerir
+            // o mesmo código pras duas (2026-08-26).
+            App.db.getAll('products').then(function (freshProducts) {
+              skuFieldInput.value = App.core.productCodes.suggestNext(prefix, freshProducts);
+            });
           }
 
           categorySelectEl.addEventListener('change', function () { applyCodeSuggestion(false); });

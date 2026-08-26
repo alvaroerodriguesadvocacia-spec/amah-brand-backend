@@ -58,7 +58,9 @@
 
       var itemsBody = App.ui.el('div', { class: 'card-body', id: 'pur-items-body' });
       var totalRow = App.ui.el('div', { id: 'pur-total-row', style: 'margin-top:14px; font-weight:700; font-size:16px;' });
-      var submitBtn = App.ui.el('button', { class: 'btn btn-primary', style: 'margin-top:10px;', onclick: submit }, ['Criar compra']);
+      // guardClick evita clique duplo/duplo toque criando duas compras
+      // (2026-08-26).
+      var submitBtn = App.ui.el('button', { class: 'btn btn-primary', style: 'margin-top:10px;', onclick: function () { if (App.ui.guardClick(submitBtn)) submit(); } }, ['Criar compra']);
       container.appendChild(App.ui.el('div', { class: 'card' }, [
         App.ui.el('div', { class: 'card-header' }, [App.ui.el('h2', {}, ['Itens'])]), itemsBody,
         App.ui.el('div', { class: 'card-body', style: 'padding-top:0;' }, [totalRow, submitBtn])

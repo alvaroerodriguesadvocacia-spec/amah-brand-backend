@@ -88,12 +88,24 @@
       confirmLabel: 'Excluir'
     }).then(function (confirmed) {
       if (!confirmed) return;
-      App.db.runAtomic(['categories', 'audit_logs'], 'readwrite', function (t) {
-        t.objectStore('categories').delete(cat.id);
-        App.core.audit.log(t, { operation: 'DELETE', entity: 'categories', entityId: cat.id, oldValue: cat });
-      }).then(function () {
-        App.ui.toast('Categoria excluída.', 'success');
-        loadList();
+      // Reconfere agora, na hora de excluir de verdade — a contagem que
+      // chegou como parâmetro é só a foto da tela no momento em que a lista
+      // carregou; se alguém cadastrou uma peça nessa categoria enquanto a
+      // tela ficou aberta, essa foto está desatualizada e deixaria excluir
+      // uma categoria já em uso, órfãando o produto (2026-08-26).
+      App.db.getByIndex('products', 'categoryId', cat.id).then(function (linked) {
+        if (linked && linked.length > 0) {
+          App.ui.toast('Não é possível excluir: há ' + linked.length + ' produto(s) usando esta categoria.', 'error');
+          loadList();
+          return;
+        }
+        return App.db.runAtomic(['categories', 'audit_logs'], 'readwrite', function (t) {
+          t.objectStore('categories').delete(cat.id);
+          App.core.audit.log(t, { operation: 'DELETE', entity: 'categories', entityId: cat.id, oldValue: cat });
+        }).then(function () {
+          App.ui.toast('Categoria excluída.', 'success');
+          loadList();
+        });
       }).catch(function (err) { App.ui.toast(err.message, 'error'); });
     });
   }

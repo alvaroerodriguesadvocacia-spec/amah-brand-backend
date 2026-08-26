@@ -33,7 +33,10 @@
           ]),
           App.ui.el('div', { style: 'margin-top:14px;' }, [
             App.ui.el('button', {
-              class: 'btn btn-primary', onclick: function () {
+              // guardClick evita clique duplo/duplo toque abrindo dois
+              // caixas ao mesmo tempo (2026-08-26).
+              class: 'btn btn-primary', onclick: function (e) {
+                if (!App.ui.guardClick(e.currentTarget)) return;
                 cashEngine.openSession(Number(openingInput.value) || 0, '').then(function () {
                   App.ui.toast('Caixa aberto.', 'success');
                   load();
@@ -75,7 +78,10 @@
             ]),
             App.ui.el('div', { style: 'margin-top:10px;' }, [
               App.ui.el('button', {
-                class: 'btn btn-secondary', onclick: function () {
+                // guardClick evita clique duplo/duplo toque duplicando a
+                // movimentação de caixa (2026-08-26).
+                class: 'btn btn-secondary', onclick: function (e) {
+                  if (!App.ui.guardClick(e.currentTarget)) return;
                   var type = document.getElementById('cm-type').value;
                   var amount = Number(document.getElementById('cm-amount').value);
                   var desc = document.getElementById('cm-desc').value.trim();
@@ -106,7 +112,10 @@
             ]),
             App.ui.el('div', { style: 'margin-top:10px;' }, [
               App.ui.el('button', {
-                class: 'btn btn-danger', onclick: function () {
+                // guardClick evita clique duplo/duplo toque fechando o
+                // mesmo caixa duas vezes (2026-08-26).
+                class: 'btn btn-danger', onclick: function (e) {
+                  if (!App.ui.guardClick(e.currentTarget)) return;
                   var informed = Number(closingInput.value);
                   if (!isFinite(informed)) { App.ui.toast('Informe o saldo contado.', 'error'); return; }
                   cashEngine.closeSession(session.id, informed, '').then(function (closed) {

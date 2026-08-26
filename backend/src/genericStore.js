@@ -102,6 +102,21 @@ function createStoreRouter(storeName, opts) {
     next();
   }
 
+  // Middleware de alteração/exclusão: bloqueia PUT/DELETE para o papel, mas
+  // deixa POST livre — usado em audit_logs, onde a criação continua sendo um
+  // efeito colateral legítimo de telas que o vendedor pode usar (ex.:
+  // cadastrar cliente), mas alterar ou apagar um registro de auditoria já
+  // existente nunca pode ser permitido a ele (apagaria o rastro de qualquer
+  // adulteração). Independente de writeRoles/blockedRoles acima.
+  function requireMutateRole(req, res, next) {
+    if (opts.mutateBlockedRoles && opts.mutateBlockedRoles.length) {
+      if (req.user && opts.mutateBlockedRoles.indexOf(req.user.role) !== -1) {
+        return res.status(403).json({ error: 'Seu perfil de usuário não pode alterar ou excluir estes dados.' });
+      }
+    }
+    next();
+  }
+
   // POST / -> cria (gera id se ausente); PUT /:id -> upsert -> equivalente a put
   async function upsert(id, record, res) {
     const finalRecord = Object.assign({}, record, { id });
@@ -122,7 +137,7 @@ function createStoreRouter(storeName, opts) {
     }
   });
 
-  router.put('/:id', requireWriteRole, async (req, res) => {
+  router.put('/:id', requireWriteRole, requireMutateRole, async (req, res) => {
     try {
       await upsert(req.params.id, req.body, res);
     } catch (err) {
@@ -157,7 +172,7 @@ function createStoreRouter(storeName, opts) {
   });
 
   // DELETE /:id -> equivalente a remove
-  router.delete('/:id', requireWriteRole, async (req, res) => {
+  router.delete('/:id', requireWriteRole, requireMutateRole, async (req, res) => {
     try {
       await pool.query(`DELETE FROM ${table} WHERE id = $1`, [req.params.id]);
       res.json({ ok: true });
@@ -167,7 +182,7 @@ function createStoreRouter(storeName, opts) {
   });
 
   // DELETE / -> equivalente a clearStore (uso administrativo/backup — cuidado)
-  router.delete('/', requireWriteRole, async (req, res) => {
+  router.delete('/', requireWriteRole, requireMutateRole, async (req, res) => {
     try {
       await pool.query(`DELETE FROM ${table}`);
       res.json({ ok: true });

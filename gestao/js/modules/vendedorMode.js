@@ -268,25 +268,37 @@
         if (!product) { App.ui.toast('Código "' + code + '" não encontrado.', 'error'); return; }
         var stock = state.stockMap[product.id] || 0;
         if (stock <= 0) { App.ui.toast(product.name + ' está sem estoque.', 'error'); return; }
-        addToCart(product);
-        App.ui.toast('✔ ' + product.name + ' — ' + fmt.money(product.retailPrice), 'success');
+        if (addToCart(product)) App.ui.toast('✔ ' + product.name + ' — ' + fmt.money(product.retailPrice), 'success');
       }
     });
   }
 
   // ---------------- Carrinho ----------------
 
+  // Retorna true se a peça entrou de fato no carrinho — o chamador (scanner)
+  // usa isso pra só mostrar o toast de sucesso quando realmente adicionou,
+  // em vez de mostrar "✔ sucesso" logo depois de um toast de erro (bug que
+  // já existia pro caso de estoque insuficiente e agora vale também pro
+  // caso de preço não definido) (2026-08-26).
   function addToCart(product) {
+    // Peça sem preço definido (fica em R$ 0,00 até alguém preencher em
+    // Produtos) não pode ser vendida — avisa aqui, na hora de adicionar, em
+    // vez de só travar depois no "Finalizar Venda" (2026-08-26).
+    if (!(Number(product.retailPrice) > 0)) {
+      App.ui.toast('"' + product.name + '" ainda não tem preço definido — peça pra alguém preencher em Produtos antes de vender.', 'error');
+      return false;
+    }
     var stock = state.stockMap[product.id] || 0;
     var existing = state.cart.filter(function (i) { return i.productId === product.id; })[0];
     if (existing) {
-      if (existing.qty + 1 > stock) { App.ui.toast('Estoque insuficiente para mais uma unidade de "' + product.name + '".', 'error'); return; }
+      if (existing.qty + 1 > stock) { App.ui.toast('Estoque insuficiente para mais uma unidade de "' + product.name + '".', 'error'); return false; }
       existing.qty += 1;
     } else {
       state.cart.push({ productId: product.id, name: product.name, sku: product.sku, unitPrice: product.retailPrice, qty: 1, discount: 0, image: product.image, maxStock: stock });
     }
     renderCart();
     renderBottomBar();
+    return true;
   }
 
   function changeQty(item, delta) {

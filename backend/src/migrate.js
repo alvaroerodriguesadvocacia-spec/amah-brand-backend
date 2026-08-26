@@ -45,6 +45,12 @@ async function migrate() {
     await client.query(`CREATE INDEX IF NOT EXISTS store_products_active_idx ON store_products (( data->>'active' ));`);
     await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS store_sales_number_idx ON store_sales (( data->>'number' )) WHERE data->>'number' IS NOT NULL;`);
     await client.query(`CREATE INDEX IF NOT EXISTS store_inventory_movements_product_idx ON store_inventory_movements (( data->>'productId' ));`);
+    // Trava em nível de banco: nunca mais de um caixa "aberto" ao mesmo tempo.
+    // A rota /operations/cash/open já bloqueia isso lendo as sessões com
+    // FOR UPDATE, mas esse lock não protege a primeiríssima sessão (tabela
+    // vazia, nada pra travar) — esse índice fecha exatamente essa brecha
+    // (2026-08-26).
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS store_cash_sessions_single_open_idx ON store_cash_sessions ((1)) WHERE data->>'status' = 'aberto';`);
 
     await client.query('COMMIT');
     console.log('[migrate] schema OK (%d stores + users)', STORE_NAMES.length);

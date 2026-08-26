@@ -95,12 +95,22 @@
       confirmLabel: 'Excluir'
     }).then(function (confirmed) {
       if (!confirmed) return;
-      App.db.runAtomic(['suppliers', 'audit_logs'], 'readwrite', function (t) {
-        t.objectStore('suppliers').delete(sup.id);
-        App.core.audit.log(t, { operation: 'DELETE', entity: 'suppliers', entityId: sup.id, oldValue: sup });
-      }).then(function () {
-        App.ui.toast('Fornecedor excluído.', 'success');
-        loadList();
+      // Reconfere agora, na hora de excluir de verdade — a contagem que
+      // chegou como parâmetro é só a foto da tela no momento em que a lista
+      // carregou (2026-08-26, mesmo ajuste feito em categories.js).
+      App.db.getByIndex('products', 'supplierId', sup.id).then(function (linked) {
+        if (linked && linked.length > 0) {
+          App.ui.toast('Não é possível excluir: há ' + linked.length + ' produto(s) vinculado(s) a este fornecedor.', 'error');
+          loadList();
+          return;
+        }
+        return App.db.runAtomic(['suppliers', 'audit_logs'], 'readwrite', function (t) {
+          t.objectStore('suppliers').delete(sup.id);
+          App.core.audit.log(t, { operation: 'DELETE', entity: 'suppliers', entityId: sup.id, oldValue: sup });
+        }).then(function () {
+          App.ui.toast('Fornecedor excluído.', 'success');
+          loadList();
+        });
       }).catch(function (err) { App.ui.toast(err.message, 'error'); });
     });
   }

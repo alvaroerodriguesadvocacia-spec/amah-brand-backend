@@ -159,7 +159,13 @@ router.post('/sales/finalize', txRoute(async (client, req) => {
     const qty = Number(it.qty);
     if (!isFinite(qty) || qty <= 0) throw httpError(400, 'Quantidade de "' + product.name + '" deve ser maior que zero.');
     const unitPrice = Number(it.unitPrice);
-    if (!isFinite(unitPrice) || unitPrice < 0) throw httpError(400, 'Preço de "' + product.name + '" inválido.');
+    // unitPrice precisa ser MAIOR que zero — uma peça cadastrada sem preço
+    // (fica em R$ 0,00 até alguém preencher) não pode ser vendida de graça
+    // por engano; pra dar desconto total de propósito, usa-se o campo
+    // "desconto" do item, que continua livre (2026-08-26).
+    if (!isFinite(unitPrice) || unitPrice <= 0) {
+      throw httpError(400, 'A peça "' + product.name + '" ainda não tem preço definido. Defina o preço de varejo em Produtos antes de vender.');
+    }
     const discount = Number(it.discount) || 0;
     const lineTotal = round2(qty * unitPrice - discount);
     if (lineTotal < 0) throw httpError(400, 'Desconto maior que o valor do item "' + product.name + '".');
@@ -530,7 +536,17 @@ router.post('/cash/open', txRoute(async (client, req) => {
     id: uuid(), status: 'aberto', openingBalance: balance, openedAt: nowIso(), closedAt: null,
     closingBalanceExpected: null, closingBalanceInformed: null, difference: null, notes: (req.body && req.body.notes) || ''
   };
-  await putRow(client, 'store_cash_sessions', session.id, session);
+  // FOR UPDATE acima não trava nada quando a tabela ainda está vazia (não há
+  // linha pra travar) — isso só importa na primeiríssima sessão de caixa de
+  // todas; o índice único store_cash_sessions_single_open_idx (migrate.js) é
+  // quem garante isso de verdade nesse caso raro, então traduzimos a
+  // violação dele pra uma mensagem amigável em vez do erro cru do Postgres.
+  try {
+    await putRow(client, 'store_cash_sessions', session.id, session);
+  } catch (err) {
+    if (err.code === '23505') throw httpError(400, 'Já existe um caixa aberto. Feche-o antes de abrir um novo.');
+    throw err;
+  }
   await auditLog(client, { operation: 'CREATE', entity: 'cash_sessions', entityId: session.id, newValue: session, userId: req.user && req.user.sub });
   return session;
 }));
@@ -580,7 +596,11 @@ router.post('/cash/:id/close', txRoute(async (client, req) => {
 /* Inventário (InventoryEngine)                                            */
 /* ---------------------------------------------------------------------- */
 
-router.post('/inventory/count/start', txRoute(async (client, req) => {
+// Inventário é área administrativa (mesma política já aplicada às stores
+// stock_counts/stock_count_items no CRUD genérico — ver app.js) — sem isso
+// aqui, um vendedor conseguia iniciar/ler contagens direto pela API mesmo
+// não tendo essa tela no menu (2026-08-26).
+router.post('/inventory/count/start', adminOnly, txRoute(async (client, req) => {
   const all = await getAll(client, 'store_stock_counts', true);
   const open = all.filter((c) => c.status === 'em_andamento')[0];
   if (open) return open;
@@ -589,7 +609,7 @@ router.post('/inventory/count/start', txRoute(async (client, req) => {
   return count;
 }));
 
-router.post('/inventory/count/:id/reading', txRoute(async (client, req) => {
+router.post('/inventory/count/:id/reading', adminOnly, txRoute(async (client, req) => {
   const stockCountId = req.params.id;
   const productId = req.body && req.body.productId;
   const mode = (req.body && req.body.mode) || 'add'; // 'add' | 'set'
@@ -613,7 +633,7 @@ router.post('/inventory/count/:id/reading', txRoute(async (client, req) => {
   return item;
 }));
 
-router.get('/inventory/count/:id/divergences', txRoute(async (client, req) => {
+router.get('/inventory/count/:id/divergences', adminOnly, txRoute(async (client, req) => {
   const items = await getByIndex(client, 'store_stock_count_items', 'stockCountId', req.params.id, false);
   return items.map((i) => Object.assign({}, i, { difference: i.countedQty - i.systemQty }));
 }));
@@ -623,7 +643,11 @@ router.post('/inventory/count/:id/confirm-adjustments', adminOnly, txRoute(async
   const itemIds = (req.body && req.body.itemIds) || [];
   const items = await getByIndex(client, 'store_stock_count_items', 'stockCountId', stockCountId, true);
   const allWithDiff = items.map((i) => Object.assign({}, i, { difference: i.countedQty - i.systemQty }));
-  const toAdjust = allWithDiff.filter((i) => itemIds.indexOf(i.id) !== -1 && i.difference !== 0);
+  // !i.adjusted evita reprocessar um item que uma chamada anterior (ex.: uma
+  // repetição da mesma requisição após timeout, ou duplo clique) já ajustou —
+  // sem isso, um reenvio dos mesmos itemIds gerava um segundo ajuste de
+  // estoque para a mesma divergência (2026-08-26).
+  const toAdjust = allWithDiff.filter((i) => itemIds.indexOf(i.id) !== -1 && i.difference !== 0 && !i.adjusted);
   if (toAdjust.length === 0) return [];
 
   const movements = toAdjust.map((i) => buildStockMovement({
@@ -642,7 +666,7 @@ router.post('/inventory/count/:id/confirm-adjustments', adminOnly, txRoute(async
   return updatedItems;
 }));
 
-router.post('/inventory/count/:id/finish', txRoute(async (client, req) => {
+router.post('/inventory/count/:id/finish', adminOnly, txRoute(async (client, req) => {
   const count = await getRow(client, 'store_stock_counts', req.params.id, true);
   if (!count) throw httpError(404, 'Inventário não encontrado.');
   const updated = Object.assign({}, count, { status: 'concluido', finishedAt: nowIso() });
