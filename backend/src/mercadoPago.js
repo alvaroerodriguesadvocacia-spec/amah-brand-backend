@@ -91,7 +91,12 @@ async function createPixPayment(params) {
     payment_method_id: 'pix',
     external_reference: params.externalReference,
     notification_url: params.notificationUrl,
-    payer: { email: params.payerEmail || 'cliente@amahbrand.com.br' }
+    payer: { email: params.payerEmail || 'cliente@amahbrand.com.br' },
+    // Opcional — quando informado, o Mercado Pago para de aceitar esse PIX
+    // depois desse horário (ISO 8601 com fuso). Usado pelo link de pagamento
+    // da Vitrine, pra deixar claro pra cliente que é uma cobrança com prazo
+    // curto, não uma cobrança "em aberto" por tempo indefinido.
+    date_of_expiration: params.dateOfExpiration || undefined
   };
   return mpFetch('/v1/payments', { method: 'POST', body: body, idempotencyKey: params.externalReference });
 }

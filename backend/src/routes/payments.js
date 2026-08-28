@@ -112,6 +112,63 @@ router.post('/vitrine/orders/:id/pay', async (req, res) => {
   }
 });
 
+// Quantos minutos o link de pagamento Pix da Vitrine fica válido — a pedido
+// da usuária ("quero que a pessoa receba pelo pix apenas o link de
+// pagamento para pagar em alguns minutos"), 2026-08-28. Só afeta esta rota
+// (Pix direto da Vitrine); cartão/boleto pelo Checkout Pro continuam sem
+// prazo próprio (regra do Mercado Pago pra Preference).
+const VITRINE_PIX_EXPIRATION_MINUTES = 30;
+
+// ------------------------------------------------------------------
+// Vitrine — Pix direto (sem passar pela tela de várias opções do Checkout
+// Pro): cria o pagamento Pix já e devolve um LINK único (ticket_url, uma
+// página do próprio Mercado Pago com o QR Code/copia-e-cola) pra cliente
+// abrir e pagar. Mesmo pedido/mesma validação da rota de cima — só muda
+// qual chamada é feita no Mercado Pago (Payment direto em vez de
+// Preference) e o que volta pro frontend (um link em vez de initPoint).
+// ------------------------------------------------------------------
+router.post('/vitrine/orders/:id/pay-pix', async (req, res) => {
+  try {
+    if (!mercadoPago.enabled) {
+      return res.status(503).json({ error: 'O pagamento automático ainda não foi configurado neste sistema. Tente novamente mais tarde ou fale conosco pelo WhatsApp.' });
+    }
+    const orderId = req.params.id;
+    const result = await pool.query('SELECT data FROM store_public_orders WHERE id = $1', [orderId]);
+    const order = result.rows[0] ? result.rows[0].data : null;
+    if (!order) return res.status(404).json({ error: 'Pedido não encontrado.' });
+    if (order.status !== 'novo') return res.status(400).json({ error: 'Este pedido já foi processado.' });
+    if (!order.items || !order.items.length) return res.status(400).json({ error: 'Pedido sem itens.' });
+
+    const total = round2(order.items.reduce((sum, it) => sum + it.qty * it.unitPrice, 0));
+    const expiresAt = new Date(Date.now() + VITRINE_PIX_EXPIRATION_MINUTES * 60000).toISOString();
+
+    const payment = await mercadoPago.createPixPayment({
+      amount: total,
+      description: 'Pedido AMÁH Brand #' + order.id,
+      externalReference: 'vitrine:' + order.id,
+      notificationUrl: notificationUrl(),
+      payerEmail: order.customerEmail || undefined,
+      dateOfExpiration: expiresAt
+    });
+
+    const txData = payment.point_of_interaction && payment.point_of_interaction.transaction_data;
+    const ticketUrl = txData && txData.ticket_url;
+    if (!ticketUrl) {
+      throw httpError(502, 'O Mercado Pago não devolveu o link de pagamento do Pix. Tente novamente ou fale conosco pelo WhatsApp.');
+    }
+
+    res.json({
+      ticketUrl: ticketUrl,
+      qrCode: (txData && txData.qr_code) || null,
+      qrCodeBase64: (txData && txData.qr_code_base64) || null,
+      expiresAt: expiresAt,
+      orderId: order.id
+    });
+  } catch (err) {
+    res.status(err.httpStatus || 500).json({ error: err.message });
+  }
+});
+
 // ------------------------------------------------------------------
 // Modo Vendedor (presencial) — cria uma cobrança PIX (QR Code devolvido na
 // hora, pra mostrar na tela da vendedora) ou cartão (link/QR pro celular do

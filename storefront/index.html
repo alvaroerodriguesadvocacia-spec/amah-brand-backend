@@ -164,6 +164,9 @@
   .checkout:hover{background:var(--tinta)}
   .checkout svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
   .checkout:disabled{opacity:.5;cursor:default}
+  .checkout-secondary{background:transparent;color:var(--rose-escuro);border:1px solid var(--rose-escuro);margin-top:9px}
+  .checkout-secondary:hover{background:rgba(0,0,0,.04)}
+  .checkout-hint{text-align:center;font-size:10.5px;color:var(--tinta-suave);margin-top:8px;letter-spacing:.02em}
 
   /* ---------------- toast ---------------- */
   .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--tinta);color:var(--champanhe);font-family:'Jost';font-size:12.5px;padding:13px 22px;border-radius:999px;z-index:120;opacity:0;transition:.4s;white-space:nowrap;box-shadow:0 12px 24px -10px rgba(0,0,0,.35)}
@@ -314,10 +317,14 @@
     <div class="drawer-foot" id="cartfoot" style="display:none">
       <div class="totalrow"><span>Total</span><b id="carttotal">R$ 0,00</b></div>
       <input class="namefield" id="cart-nome" placeholder="Seu nome"/>
-      <button class="checkout" id="checkoutbtn" onclick="checkout()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
-        Finalizar compra
+      <button class="checkout" id="checkoutbtn-pix" onclick="checkout('pix')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 12l3 3 7-7"/><rect x="2" y="5" width="20" height="14" rx="2"/></svg>
+        Pagar com Pix
       </button>
+      <button class="checkout checkout-secondary" id="checkoutbtn-outros" onclick="checkout('outros')">
+        Cart&atilde;o ou boleto
+      </button>
+      <div class="checkout-hint">Pix: voc&ecirc; recebe um link pra pagar em minutos.</div>
     </div>
   </div>
 
@@ -575,7 +582,11 @@
   // falhar por algum motivo (backend fora do ar, Mercado Pago ainda não
   // configurado etc.), pra nunca deixar a cliente sem conseguir comprar.
   var checkoutInProgress = false;
-  function checkout(){
+  // method: 'pix' (link direto de pagamento Pix, expira em minutos) ou
+  // 'outros' (Checkout Pro do Mercado Pago — cartão e boleto à vista).
+  // Pix ganhou fluxo próprio a pedido da usuária (2026-08-28): a cliente
+  // recebe só um link, sem passar pela tela com várias opções.
+  function checkout(method){
     if (checkoutInProgress) return;
     var keys=Object.keys(cart);if(!keys.length)return;
     var nome=document.getElementById('cart-nome').value.trim();
@@ -586,10 +597,20 @@
     if (!items.length) return;
 
     checkoutInProgress = true;
-    var btn = document.getElementById('checkoutbtn');
-    var originalHtml = btn.innerHTML;
-    btn.innerHTML = 'Preparando pagamento…';
-    btn.setAttribute('disabled', 'disabled');
+    var pixBtn = document.getElementById('checkoutbtn-pix');
+    var outrosBtn = document.getElementById('checkoutbtn-outros');
+    var clickedBtn = method === 'pix' ? pixBtn : outrosBtn;
+    var originalHtml = clickedBtn.innerHTML;
+    clickedBtn.innerHTML = 'Preparando pagamento…';
+    pixBtn.setAttribute('disabled', 'disabled');
+    outrosBtn.setAttribute('disabled', 'disabled');
+
+    function restoreButtons() {
+      clickedBtn.innerHTML = originalHtml;
+      pixBtn.removeAttribute('disabled');
+      outrosBtn.removeAttribute('disabled');
+      checkoutInProgress = false;
+    }
 
     fetch(API_BASE + '/api/v1/public/orders', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -600,22 +621,24 @@
         return data;
       });
     }).then(function (order) {
-      return fetch(API_BASE + '/api/v1/payments/vitrine/orders/' + order.id + '/pay', { method: 'POST' })
+      var path = method === 'pix'
+        ? '/api/v1/payments/vitrine/orders/' + order.id + '/pay-pix'
+        : '/api/v1/payments/vitrine/orders/' + order.id + '/pay';
+      return fetch(API_BASE + path, { method: 'POST' })
         .then(function (res) {
           return res.json().then(function (data) {
-            if (!res.ok || !data.initPoint) throw new Error((data && data.error) || 'Não foi possível iniciar o pagamento.');
-            return data;
+            var link = method === 'pix' ? data.ticketUrl : data.initPoint;
+            if (!res.ok || !link) throw new Error((data && data.error) || 'Não foi possível iniciar o pagamento.');
+            return link;
           });
         });
-    }).then(function (payData) {
-      toast('Redirecionando para o pagamento…');
-      window.location.href = payData.initPoint; // sai da Vitrine pro Checkout Pro — não precisa reabilitar o botão
+    }).then(function (link) {
+      toast(method === 'pix' ? 'Abrindo o link de pagamento Pix…' : 'Redirecionando para o pagamento…');
+      window.location.href = link; // sai da Vitrine pro Mercado Pago — não precisa reabilitar o botão
     }).catch(function (err) {
       console.warn('Checkout automático indisponível, usando WhatsApp como alternativa:', err);
       checkoutFallbackWhatsApp(items, total, nome);
-      btn.innerHTML = originalHtml;
-      btn.removeAttribute('disabled');
-      checkoutInProgress = false;
+      restoreButtons();
     });
   }
 
