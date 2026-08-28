@@ -728,9 +728,11 @@
     var photo = null; // preenchido depois que o form monta (ver photoField)
     var whyAmahr = null; // preenchido depois que o form monta (ver whyAmahrField)
 
-    Promise.all([App.db.getAll('categories'), App.db.getAll('suppliers')]).then(function (results) {
+    Promise.all([App.db.getAll('categories'), App.db.getAll('suppliers'), App.db.getById('settings', 'company')]).then(function (results) {
       var categories = results[0].filter(function (c) { return c.active; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
       var suppliers = results[1].filter(function (s) { return s.active; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
+      var company = results[2];
+      var idealMargin = company && company.idealMarginPercent != null ? Number(company.idealMarginPercent) || 0 : 65;
       photo = photoField(existing && existing.image);
       whyAmahr = whyAmahrField(existing, results[0]);
 
@@ -754,6 +756,9 @@
         inputField('p-retail', 'Preço de varejo (R$)', existing ? existing.retailPrice : '', { attrs: { type: 'number', step: '0.01', min: '0', placeholder: 'Pode preencher depois' } }),
         inputField('p-wholesale', 'Preço de atacado (R$)', existing ? existing.wholesalePrice : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
         inputField('p-promo', 'Preço promocional (R$)', existing ? existing.promoPrice : '', { attrs: { type: 'number', step: '0.01', min: '0' } }),
+        App.ui.el('div', { class: 'form-field span-2', id: 'p-suggested-price-wrap' }, [
+          App.ui.el('div', { class: 'hint', id: 'p-suggested-price-hint' }, [''])
+        ]),
 
         App.ui.el('div', { class: 'form-section-title' }, ['Estoque']),
         isEdit
@@ -783,6 +788,38 @@
         whyAmahr.node
       ]);
       wrapper.appendChild(form);
+
+      // Preço sugerido em tempo real, a partir do custo + custos adicionais
+      // digitados e da margem de lucro ideal configurada em Configurações →
+      // Empresa (padrão 65% se a empresa ainda não tiver configurado nada).
+      // Só mostra a dica quando há algum custo lançado; nunca preenche o
+      // campo de preço sozinho — a usuária decide se quer usar, clicando em
+      // "Usar este preço" (2026-08-28).
+      (function () {
+        var costInput = form.querySelector('#p-cost');
+        var addCostInput = form.querySelector('#p-addcost');
+        var retailInput = form.querySelector('#p-retail');
+        var suggestedHint = form.querySelector('#p-suggested-price-hint');
+        if (!costInput || !addCostInput || !retailInput || !suggestedHint) return;
+
+        function updateSuggestedPrice() {
+          var totalCost = (Number(costInput.value) || 0) + (Number(addCostInput.value) || 0);
+          suggestedHint.innerHTML = '';
+          if (totalCost <= 0 || idealMargin >= 100) return;
+          var suggested = totalCost / (1 - idealMargin / 100);
+          suggestedHint.appendChild(App.ui.el('span', {}, [
+            '💡 Preço sugerido pra margem ideal (' + fmt.percent(idealMargin) + '): ' + fmt.money(suggested)
+          ]));
+          suggestedHint.appendChild(App.ui.el('button', {
+            type: 'button', class: 'btn btn-ghost btn-sm', style: 'margin-left:8px;',
+            onclick: function () { retailInput.value = suggested.toFixed(2); }
+          }, ['Usar este preço']));
+        }
+
+        costInput.addEventListener('input', updateSuggestedPrice);
+        addCostInput.addEventListener('input', updateSuggestedPrice);
+        updateSuggestedPrice();
+      })();
 
       // Sugestão de código (Fase B — padronização): só no cadastro de produto
       // NOVO, e só preenche automaticamente enquanto o campo está vazio. Nunca
