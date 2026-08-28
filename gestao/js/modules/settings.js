@@ -30,7 +30,7 @@
       App.db.getById('settings', 'payment_methods')
     ]).then(function (results) {
       var ops = [];
-      if (!results[0]) ops.push(App.db.put('settings', { id: 'company', name: 'AMÁH Brand', cnpjCpf: '', phone: '', email: '', address: '' }));
+      if (!results[0]) ops.push(App.db.put('settings', { id: 'company', name: 'AMÁH Brand', cnpjCpf: '', phone: '', email: '', address: '', idealMarginPercent: 65 }));
       if (!results[1]) ops.push(App.db.put('settings', { id: 'expense_categories', items: DEFAULT_EXPENSE_CATEGORIES.map(function (n) { return { id: App.core.uuid(), name: n, active: true }; }) }));
       if (!results[2]) ops.push(App.db.put('settings', { id: 'payment_methods', items: DEFAULT_PAYMENT_METHODS.map(function (m) { return { id: App.core.uuid(), name: m.name, feePercent: m.feePercent, active: true }; }) }));
       return Promise.all(ops);
@@ -80,6 +80,7 @@
   function renderCompanyPanel(panel) {
     App.db.getById('settings', 'company').then(function (company) {
       company = company || { id: 'company' };
+      var idealMargin = company.idealMarginPercent != null ? company.idealMarginPercent : 65;
       var form = App.ui.el('div', { class: 'form-grid' }, [
         App.ui.el('div', { class: 'form-field span-2' }, [App.ui.el('label', {}, ['Nome da empresa']), App.ui.el('input', { id: 'set-company-name', value: company.name || '' })]),
         App.ui.el('div', { class: 'form-field' }, [App.ui.el('label', {}, ['CNPJ/CPF']), App.ui.el('input', { id: 'set-company-doc', value: company.cnpjCpf || '' })]),
@@ -100,11 +101,30 @@
                   cnpjCpf: document.getElementById('set-company-doc').value.trim(),
                   phone: document.getElementById('set-company-phone').value.trim(),
                   email: document.getElementById('set-company-email').value.trim(),
-                  address: document.getElementById('set-company-address').value.trim()
+                  address: document.getElementById('set-company-address').value.trim(),
+                  idealMarginPercent: Number(document.getElementById('set-company-margin').value) || 0
                 };
                 App.db.put('settings', record).then(function () { App.ui.toast('Dados da empresa salvos.', 'success'); });
               }
             }, ['Salvar dados da empresa'])
+          ])
+        ])
+      ]));
+
+      panel.appendChild(App.ui.el('div', { class: 'card' }, [
+        App.ui.el('div', { class: 'card-header' }, [App.ui.el('h2', {}, ['Margem de lucro ideal'])]),
+        App.ui.el('div', { class: 'card-body' }, [
+          App.ui.el('p', { class: 'text-muted' }, [
+            'Usada no Dashboard para mostrar quais peças estão vendendo abaixo do ideal e sugerir um novo preço. Sugestão baseada no que pequenas marcas de bijuteria costumam praticar: em torno de 65% (equivale a vender por cerca de 3x o custo da peça). Ajuste se quiser trabalhar com uma margem diferente.'
+          ]),
+          App.ui.el('div', { class: 'form-grid' }, [
+            App.ui.el('div', { class: 'form-field' }, [
+              App.ui.el('label', {}, ['Margem de lucro ideal (%)']),
+              App.ui.el('input', { id: 'set-company-margin', type: 'number', step: '1', min: '0', max: '95', value: String(idealMargin) })
+            ])
+          ]),
+          App.ui.el('p', { class: 'text-muted', style: 'margin-top:8px;' }, [
+            'Dica: o custo de embalagem e caixinha de cada peça pode ser incluído no campo "Custos adicionais" do cadastro do produto, para que a margem calculada já considere esse gasto.'
           ])
         ])
       ]));
