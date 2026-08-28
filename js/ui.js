@@ -20,10 +20,22 @@
     var node = document.createElement(tag);
     attrs = attrs || {};
     Object.keys(attrs).forEach(function (key) {
-      if (key === 'class') node.className = attrs[key];
-      else if (key === 'html') node.innerHTML = attrs[key];
-      else if (key.indexOf('on') === 0 && typeof attrs[key] === 'function') node.addEventListener(key.slice(2), attrs[key]);
-      else node.setAttribute(key, attrs[key]);
+      var value = attrs[key];
+      // Vários lugares no código montam o atributo condicionalmente assim:
+      // `disabled: condicao ? 'disabled' : undefined` (em vez de simplesmente
+      // omitir a chave quando não se aplica). Sem este `if`, o setAttribute
+      // abaixo virava `setAttribute('disabled', undefined)` — e o
+      // navegador transforma isso em `disabled="undefined"`, que ainda é um
+      // atributo PRESENTE (checkbox/campo desabilitado mesmo quando a
+      // intenção era deixar habilitado; `selected="undefined"` em <option>
+      // do mesmo jeito). Era exatamente por isso que as caixinhas de
+      // "Confirmar ajustes" do Inventário apareciam sem reagir a clique
+      // (2026-08-26).
+      if (value === undefined || value === null) return;
+      if (key === 'class') node.className = value;
+      else if (key === 'html') node.innerHTML = value;
+      else if (key.indexOf('on') === 0 && typeof value === 'function') node.addEventListener(key.slice(2), value);
+      else node.setAttribute(key, value);
     });
     (children || []).forEach(function (child) {
       if (child == null) return;
