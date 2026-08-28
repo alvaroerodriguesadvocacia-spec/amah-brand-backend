@@ -108,6 +108,13 @@ router.post('/vitrine/orders/:id/pay', async (req, res) => {
 
     res.json({ initPoint: preference.init_point, orderId: order.id });
   } catch (err) {
+    // Diferente do webhook (que já logava), esta rota respondia o erro só
+    // pro navegador sem deixar rastro no log do servidor — corrigido em
+    // 2026-08-28 depois de um teste real da usuária não deixar pista
+    // nenhuma pra investigar. mpResponse (quando existe) traz o motivo
+    // exato devolvido pelo Mercado Pago (ex.: método de pagamento não
+    // habilitado pra esta conta).
+    console.error('Erro ao criar cobrança (Vitrine, Checkout Pro) orderId=' + req.params.id + ':', err.message, err.mpResponse || '');
     res.status(err.httpStatus || 500).json({ error: err.message });
   }
 });
@@ -165,6 +172,7 @@ router.post('/vitrine/orders/:id/pay-pix', async (req, res) => {
       orderId: order.id
     });
   } catch (err) {
+    console.error('Erro ao criar cobrança Pix (Vitrine, link direto) orderId=' + req.params.id + ':', err.message, err.mpResponse || '');
     res.status(err.httpStatus || 500).json({ error: err.message });
   }
 });
@@ -223,6 +231,7 @@ router.post('/presencial/charge', requireAuth, requireRole('admin', 'vendedor'),
     await pool.query('INSERT INTO store_mp_charges (id, data, updated_at) VALUES ($1,$2, now())', [charge.id, charge]);
     res.status(201).json(charge);
   } catch (err) {
+    console.error('Erro ao criar cobrança presencial (' + (req.body && req.body.methodType) + '):', err.message, err.mpResponse || '');
     res.status(err.httpStatus || 500).json({ error: err.message });
   }
 });
